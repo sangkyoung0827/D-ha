@@ -74,7 +74,7 @@ Production 또는 로컬 HTTPS 환경에서 브라우저의 “앱 설치” 메
 
 ## Production
 
-Production 배포 검증 후 공식 도메인 하나만 이 절에 기록합니다.
+[https://d-ha.vercel.app](https://d-ha.vercel.app)
 
 ## 알려진 제한
 
