@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: "prompt",
       includeAssets: ["icon.svg"],
       manifest: {
-        name: "Diha Keeper",
-        short_name: "Diha",
-        description: "사람 형태의 Ocean Keeper를 돌보는 로컬 우선 게임",
+        name: "알고케어",
+        short_name: "알고케어",
+        description: "알고케어의 사람 형태 Ocean Keeper를 돌보는 로컬 우선 게임",
         theme_color: "#0b7085",
         background_color: "#f5ead2",
         display: "standalone",

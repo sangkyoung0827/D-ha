@@ -18,7 +18,7 @@ export function Onboarding() {
       <main className="onboarding ocean-gradient" data-testid="onboarding">
         <div className="onboarding-orbit" aria-hidden="true"><span /><span /><span /></div>
         <div className="keeper-emblem" aria-hidden="true"><i className="emblem-head" /><i className="emblem-body" /><b>≈</b></div>
-        <p className="eyebrow">DIHA HUMAN KEEPER</p>
+        <p className="eyebrow">알고케어</p>
         <h1>바다 곁의 작은 일상을<br />함께 돌봐요.</h1>
         <p className="intro-copy">Ocean Keeper의 컨디션과 공간을 천천히 가꾸는 로컬 우선 돌봄 게임입니다.</p>
         <button className="primary-button wide" onClick={() => setStep("create")}>나의 Keeper 만들기</button>

@@ -1,4 +1,4 @@
-# Diha Human Keeper
+# 알고케어
 
 사람 형태의 `Ocean Keeper`와 일상을 돌보는 모바일 우선 로컬 게임입니다. 다섯 상태를 살피고, 8개 공간을 오가며, 세 미니게임으로 코인과 경험치를 얻습니다. 의료 서비스나 실제 웰니스 연동처럼 보이지 않도록 게임 시스템과 미래 통합 경계를 분리했습니다.
 
@@ -83,6 +83,6 @@ Production 또는 로컬 HTTPS 환경에서 브라우저의 “앱 설치” 메
 - Phaser가 초기 게임 화면에 필요해 vendor 청크가 크지만, 세 미니게임 Scene과 정의는 최초 진입 전까지 별도 청크로 지연 로딩합니다.
 - 웰니스·제품 활성화는 명시적인 Mock Provider이며 실제 제품·의료 효능을 뜻하지 않습니다.
 
-## 향후 Diha 확장
+## 향후 알고케어 확장
 
 QR 제품 활성화, serving 수량, 섭취 루틴, 알고케어·웰니스 데이터, 모바일 로컬 알림, 계정 동기화, 실제 친구, 바다 생태계 탐험은 `src/platform` 인터페이스 뒤에서 교체합니다. 세부 경계는 [INTEGRATION_BOUNDARIES.md](./INTEGRATION_BOUNDARIES.md), 모바일 전환은 [MOBILE_MIGRATION.md](./MOBILE_MIGRATION.md)를 참고합니다.

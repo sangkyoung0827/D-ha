@@ -1,4 +1,4 @@
-# Future Diha Integration Boundaries
+# 향후 알고케어 통합 경계
 
 현재 버전은 네트워크 계정이나 실제 웰니스·제품 데이터를 연결하지 않습니다. UI가 실제 연동처럼 보이지 않도록 모든 기본 구현은 `Mock` 또는 `Local demo`로 명시합니다.
 
