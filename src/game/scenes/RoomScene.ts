@@ -208,28 +208,9 @@ export class RoomScene extends Phaser.Scene {
   }
 
   private drawKitchen(g: Phaser.GameObjects.Graphics): void {
-    g.fillGradientStyle(0xe5f4ef, 0xe5f4ef, 0xf8edda, 0xf8edda, 1).fillRect(0, 0, 390, 700);
-    g.fillStyle(0xe4cfab).fillRect(0, 506, 390, 194);
-    g.lineStyle(1, 0xffffff, 0.62);
-    for (let x = 0; x <= 390; x += 39) g.lineBetween(x, 116, x, 310);
-    for (let y = 116; y <= 310; y += 38) g.lineBetween(0, y, 390, y);
-    g.fillStyle(0xb9ddd5).fillRoundedRect(18, 94, 94, 248, 18);
-    g.lineStyle(2, 0x7ca9a3, 0.6).lineBetween(18, 210, 112, 210);
-    g.fillStyle(0x6c9793).fillRoundedRect(90, 148, 5, 35, 3).fillRoundedRect(90, 250, 5, 35, 3);
-    g.fillStyle(0xfaf8ef).fillRoundedRect(128, 262, 244, 82, 15);
-    g.fillStyle(0x79bdb5).fillRect(125, 300, 250, 18).fillRoundedRect(137, 318, 104, 104, 12).fillRoundedRect(251, 318, 112, 104, 12);
-    g.fillStyle(0x819c9a).fillEllipse(200, 301, 78, 13);
-    g.lineStyle(5, 0x819c9a).beginPath().moveTo(196, 278).lineTo(196, 257).lineTo(217, 251).lineTo(217, 278).strokePath();
-    g.fillStyle(0xf7f4e8).fillRoundedRect(142, 134, 205, 16, 8);
-    g.fillStyle(0xefaa76).fillRoundedRect(164, 91, 20, 42, 7);
-    g.fillStyle(0x67b6ad).fillRoundedRect(205, 101, 18, 32, 6);
-    g.fillStyle(0xf3cf76).fillCircle(252, 119, 13);
-    g.lineStyle(4, 0x7f9b96).strokeCircle(300, 112, 22).strokeCircle(300, 112, 14);
-    g.fillStyle(this.themeAccent(), 0.34).fillEllipse(242, 553, 208, 64);
-    g.fillStyle(0xf9edd0).fillRoundedRect(252, 430, 124, 69, 20);
-    g.fillStyle(0xc69668).fillRoundedRect(269, 492, 13, 65, 7).fillRoundedRect(346, 492, 13, 65, 7);
-    g.fillStyle(0xffffff, 0.8).fillCircle(290, 455, 15);
-    g.fillStyle(0xeda976).fillCircle(333, 455, 9).fillCircle(348, 453, 7);
+    this.showPhotorealBackground("kitchen-photoreal");
+    this.drawPhotoReadability(g, 0x173d48, 0.08);
+    this.addPhotorealAmbience("kitchen");
   }
 
   private drawOcean(g: Phaser.GameObjects.Graphics): void {
@@ -325,79 +306,80 @@ export class RoomScene extends Phaser.Scene {
   }
 
   private drawBathroom(g: Phaser.GameObjects.Graphics): void {
-    g.fillStyle(0xe8f5f1).fillRect(0, 0, 390, 700);
-    g.lineStyle(1, 0xc5dedb, 0.8);
-    for (let x = 0; x <= 390; x += 52) g.lineBetween(x, 70, x, 510);
-    for (let y = 70; y <= 510; y += 52) g.lineBetween(0, y, 390, y);
-    g.fillStyle(0xd7c5a3).fillRect(0, 510, 390, 190);
-    g.fillStyle(0xb8e5e2, 0.48).fillRoundedRect(16, 82, 150, 376, 26);
-    g.lineStyle(5, 0x74b4b4).lineBetween(43, 112, 43, 395).beginPath().moveTo(42, 118).lineTo(68, 105).lineTo(92, 128).strokePath();
-    g.lineStyle(3, 0x74b4b4).strokeCircle(96, 138, 25);
-    for (let index = 0; index < 5; index += 1) g.lineBetween(78 + index * 9, 164, 70 + index * 10, 194);
-    g.fillStyle(0x8accca).fillRoundedRect(18, 430, 150, 36, 16);
-    g.fillStyle(0xc8e9e4).fillRoundedRect(213, 92, 132, 148, 28);
-    g.lineStyle(7, 0xffffff, 0.72).strokeRoundedRect(213, 92, 132, 148, 28);
-    g.fillStyle(0xf8f5eb).fillRoundedRect(211, 280, 151, 17, 8);
-    g.fillStyle(0xeda97d).fillRoundedRect(236, 247, 18, 33, 6);
-    g.fillStyle(0x67beb3).fillRoundedRect(268, 255, 17, 25, 6);
-    g.fillStyle(0xf1ce77).fillRoundedRect(302, 250, 20, 30, 7);
-    g.fillStyle(0xf7f5eb).fillRoundedRect(274, 385, 90, 104, 30);
-    g.fillStyle(0xd9e7e3).fillEllipse(319, 386, 92, 38);
-    g.fillStyle(this.themeAccent(), 0.3).fillEllipse(210, 558, 228, 64);
+    this.showPhotorealBackground("bathroom-photoreal");
+    this.drawPhotoReadability(g, 0x1d5a60, 0.07);
+    this.addPhotorealAmbience("bathroom");
   }
 
   private drawBedroom(g: Phaser.GameObjects.Graphics): void {
-    g.fillGradientStyle(0x142d4e, 0x142d4e, 0x243d63, 0x243d63, 1).fillRect(0, 0, 390, 700);
-    g.fillStyle(0x172943).fillRect(0, 510, 390, 190);
-    g.fillStyle(0x274d70).fillRoundedRect(226, 78, 130, 176, 30);
-    g.fillStyle(0xffefb7).fillCircle(303, 142, 37);
-    g.fillStyle(0x274d70).fillCircle(318, 130, 35);
-    g.lineStyle(6, 0x577391).strokeRoundedRect(226, 78, 130, 176, 30);
-    [[48,116],[106,88],[165,150],[201,102],[367,72],[82,232],[179,62]].forEach(([x,y], index) => g.fillStyle(index % 2 ? 0xa9d8e0 : 0xffedaf, 0.75).fillCircle(x!, y!, index % 3 + 2));
-    g.fillStyle(0x435f83).fillRoundedRect(30, 402, 330, 148, 28);
-    g.fillStyle(0xdce7ef).fillRoundedRect(47, 386, 102, 62, 24);
-    g.fillStyle(0x7694b9).fillRoundedRect(48, 435, 294, 102, 26);
-    g.fillStyle(0x91aecb, 0.72).fillRoundedRect(190, 442, 152, 95, 25);
-    g.fillStyle(0x183855).fillRoundedRect(18, 355, 62, 18, 9).fillRoundedRect(34, 371, 12, 75, 6);
-    g.fillStyle(0xffd67f).fillCircle(49, 327, 31);
-    g.fillStyle(0xffd67f, 0.15).fillCircle(49, 327, 63);
+    this.showPhotorealBackground("bedroom-photoreal");
+    this.drawPhotoReadability(g, 0x07182e, 0.14);
+    this.addPhotorealAmbience("bedroom");
   }
 
   private drawCloset(g: Phaser.GameObjects.Graphics): void {
-    g.fillGradientStyle(0xf6eee0, 0xf6eee0, 0xe8d6bc, 0xe8d6bc, 1).fillRect(0, 0, 390, 700);
-    g.fillStyle(0xd9bc91).fillRect(0, 512, 390, 188);
-    g.fillStyle(0xe3ccb0).fillRoundedRect(18, 76, 140, 378, 24);
-    g.fillStyle(0xf8f2e8).fillRoundedRect(31, 91, 114, 350, 18);
-    g.lineStyle(3, 0xa88f74).lineBetween(88, 92, 88, 441);
-    g.fillStyle(0x9d8269).fillCircle(76, 268, 4).fillCircle(100, 268, 4);
-    g.lineStyle(8, 0x8a7462).lineBetween(188, 116, 355, 116);
-    [0x58aaa7, 0xef9d85, 0x789ccc, 0xe7c069].forEach((color, index) => {
-      const x = 211 + index * 40;
-      g.lineStyle(2, 0x8a7462).beginPath().moveTo(x, 116).lineTo(x, 139).lineTo(x - 13, 151).moveTo(x, 139).lineTo(x + 13, 151).strokePath();
-      g.fillStyle(color).fillRoundedRect(x - 17, 151, 34, 90 - index * 4, 10);
-    });
-    g.fillStyle(0xd8b98e).fillRoundedRect(184, 284, 180, 158, 20);
-    g.lineStyle(2, 0xaf8f69, 0.7).lineBetween(184, 334, 364, 334).lineBetween(184, 386, 364, 386);
-    g.fillStyle(0x6eb7ad).fillRoundedRect(205, 267, 55, 14, 6);
-    g.fillStyle(0xefaa8d).fillRoundedRect(267, 270, 72, 11, 5);
-    g.fillStyle(this.themeAccent(), 0.31).fillEllipse(204, 557, 244, 68);
+    this.showPhotorealBackground("wardrobe-photoreal");
+    this.drawPhotoReadability(g, 0x4a2d1b, 0.08);
+    this.addPhotorealAmbience("wardrobe");
   }
 
   private drawWorkout(g: Phaser.GameObjects.Graphics): void {
-    g.fillGradientStyle(0xe8f0ed, 0xe8f0ed, 0xd6e2df, 0xd6e2df, 1).fillRect(0, 0, 390, 700);
-    g.fillStyle(0xa8b8b6).fillRect(0, 510, 390, 190);
-    g.lineStyle(7, 0x465e64).lineBetween(34, 108, 34, 432).lineBetween(142, 108, 142, 432).lineBetween(34, 116, 142, 116).lineBetween(34, 222, 142, 222);
-    [0x214957, 0x4b7f83, 0x214957].forEach((color, index) => {
-      g.fillStyle(color).fillCircle(52 + index * 35, 384, 18 + index * 3);
-      g.fillStyle(0xaad4cc).fillCircle(52 + index * 35, 384, 5);
-    });
-    g.fillStyle(0x294e5c).fillRoundedRect(242, 118, 104, 17, 8).fillRoundedRect(286, 134, 14, 236, 7);
-    g.fillStyle(0x75bcb2).fillRoundedRect(244, 170, 100, 120, 26);
-    g.fillStyle(0x294e5c).fillRoundedRect(220, 386, 147, 26, 12).fillRoundedRect(239, 408, 16, 70, 8).fillRoundedRect(335, 408, 16, 70, 8);
-    g.fillStyle(0x48636b).fillRoundedRect(80, 450, 165, 23, 11).fillRoundedRect(99, 470, 14, 63, 7).fillRoundedRect(215, 470, 14, 63, 7);
-    g.fillStyle(this.themeAccent(), 0.48).fillRoundedRect(72, 542, 246, 72, 28);
-    this.drawDumbbell(g, 39, 553);
-    this.drawDumbbell(g, 335, 554);
+    this.showPhotorealBackground("workout-photoreal");
+    this.drawPhotoReadability(g, 0x082e39, 0.09);
+    this.addPhotorealAmbience("workout");
+  }
+
+  private showPhotorealBackground(texture: string): void {
+    this.backgroundImage?.setTexture(texture).setDisplaySize(390, 700).clearTint().setVisible(true);
+  }
+
+  private drawPhotoReadability(g: Phaser.GameObjects.Graphics, color: number, alpha: number): void {
+    g.fillGradientStyle(color, color, color, color, alpha, alpha, 0, 0).fillRect(0, 0, 390, 112);
+    g.fillStyle(0x06191e, 0.09).fillEllipse(195, 548, 204, 46);
+  }
+
+  private addPhotorealAmbience(room: "kitchen" | "bathroom" | "bedroom" | "wardrobe" | "workout"): void {
+    const palettes = {
+      kitchen: [0xfff1c2, 0xffffff],
+      bathroom: [0xe8ffff, 0xbbe9e7],
+      bedroom: [0xc7ddff, 0xffdda0],
+      wardrobe: [0xffddb0, 0xffffff],
+      workout: [0xffe8a4, 0xd8ffff]
+    } as const;
+    const colors = palettes[room];
+    const count = room === "bathroom" ? 8 : 6;
+    for (let index = 0; index < count; index += 1) {
+      const x = 32 + ((index * 71) % 326);
+      const y = room === "bathroom" ? 175 + ((index * 53) % 280) : 92 + ((index * 89) % 390);
+      const radius = room === "bathroom" ? 3 + index % 4 : 1.2 + index % 3;
+      const mote = this.add.circle(x, y, radius, colors[index % 2]!, room === "bedroom" ? 0.14 : 0.2).setDepth(1);
+      this.ambience.push(mote);
+      if (!this.reducedMotion) {
+        this.tweens.add({
+          targets: mote,
+          x: x + (index % 2 ? 8 : -8),
+          y: y - (room === "bathroom" ? 42 : 18),
+          alpha: room === "bedroom" ? 0.28 : 0.08,
+          scale: room === "bathroom" ? 1.65 : 1.15,
+          duration: 2600 + index * 360,
+          yoyo: true,
+          repeat: -1,
+          ease: "Sine.easeInOut"
+        });
+      }
+    }
+
+    if (room === "bedroom") {
+      const moonGlow = this.add.ellipse(76, 242, 82, 210, 0x8bbcff, 0.06).setAngle(-16).setDepth(0).setBlendMode(Phaser.BlendModes.ADD);
+      this.ambience.push(moonGlow);
+      if (!this.reducedMotion) this.tweens.add({ targets: moonGlow, alpha: 0.13, duration: 3800, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    }
+
+    if (room === "workout") {
+      const sunFlare = this.add.circle(336, 94, 38, 0xffe7a0, 0.05).setDepth(0).setBlendMode(Phaser.BlendModes.ADD);
+      this.ambience.push(sunFlare);
+      if (!this.reducedMotion) this.tweens.add({ targets: sunFlare, scale: 1.24, alpha: 0.13, duration: 3000, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    }
   }
 
   private addHomeAmbience(): void {
@@ -455,11 +437,6 @@ export class RoomScene extends Phaser.Scene {
     g.fillStyle(0x173d48).fillCircle(x + 11 * direction, y - 3, 2);
   }
 
-  private drawDumbbell(g: Phaser.GameObjects.Graphics, x: number, y: number): void {
-    g.lineStyle(6, 0x314e55).lineBetween(x - 16, y, x + 16, y);
-    g.fillStyle(0x314e55).fillRoundedRect(x - 24, y - 11, 8, 22, 4).fillRoundedRect(x + 16, y - 11, 8, 22, 4);
-  }
-
   private placeKeeper(): void {
     if (!this.keeper) return;
     const placements: Record<RoomId, { x: number; y: number; scale: number; pose: "standing" | "sleeping" }> = {
@@ -467,7 +444,7 @@ export class RoomScene extends Phaser.Scene {
       kitchen: { x: 202, y: 420, scale: 0.96, pose: "standing" },
       wellness: { x: 306, y: 440, scale: 0.6, pose: "standing" },
       bathroom: { x: 205, y: 416, scale: 0.92, pose: "standing" },
-      bedroom: { x: 211, y: 458, scale: 0.72, pose: "sleeping" },
+      bedroom: { x: 211, y: 370, scale: 0.65, pose: "sleeping" },
       wardrobe: { x: 194, y: 424, scale: 0.94, pose: "standing" },
       "game-room": { x: 188, y: 418, scale: 0.96, pose: "standing" },
       shop: { x: 202, y: 420, scale: 0.96, pose: "standing" }

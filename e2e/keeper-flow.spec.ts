@@ -6,7 +6,16 @@ async function createKeeper(page: Page, name = "마루") {
   await expect(page.getByRole("img", { name: "선글라스를 쓰고 손을 흔들며 인사하는 알약 디하" })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("안녕!");
   await page.getByRole("button", { name: "디하 시작하기" }).click();
-  await page.getByLabel("캐릭터 이름").fill(name);
+  const nameInput = page.getByLabel("캐릭터 이름");
+  await nameInput.fill(name);
+  const focusStyle = await nameInput.evaluate((input) => {
+    const inputStyle = getComputedStyle(input);
+    const labelStyle = getComputedStyle(input.closest("label")!);
+    return { inputOutline: inputStyle.outlineStyle, inputShadow: inputStyle.boxShadow, labelOutline: labelStyle.outlineStyle };
+  });
+  expect(focusStyle.inputOutline).toBe("none");
+  expect(focusStyle.labelOutline).toBe("none");
+  expect(focusStyle.inputShadow).not.toBe("none");
   await page.getByTestId("appearance-cocoa").click();
   await page.getByTestId("appearance-bun").click();
   await page.getByTestId("appearance-silver").click();
@@ -144,24 +153,31 @@ test("일곱 공간 내비게이션과 Home 전용 간결한 화면 구성을 �
   }
 });
 
-test("Home에서 Kitchen을 거쳐 Ocean으로 이동하면 실제 배경 장면이 순서대로 교체된다", async ({ page }) => {
+test("생활 공간 다섯 곳이 고해상도 실사 배경으로 교체되고 방 이동에 맞춰 표시된다", async ({ page }) => {
   await createKeeper(page, "장면검사");
   const canvas = page.locator("canvas");
-  const homeFrame = await canvas.screenshot();
+  const roomAssets = [
+    ["주방", "kitchen", "Kitchen"],
+    ["욕실", "bathroom", "Bath"],
+    ["침실", "bedroom", "Sleep"],
+    ["옷장", "wardrobe", "Closet"],
+    ["운동", "workout", "Workout"]
+  ] as const;
+  const frames: Buffer[] = [await canvas.screenshot()];
 
-  await goToRoom(page, "주방");
-  await expect(page.locator(".room-kitchen .room-heading h1")).toHaveText("Kitchen");
-  await page.waitForTimeout(320);
-  const kitchenFrame = await canvas.screenshot();
+  for (const [label, asset, heading] of roomAssets) {
+    const response = await page.request.get(`/assets/${asset}-photoreal-v1.jpg`);
+    expect(response.ok()).toBe(true);
+    expect(response.headers()["content-type"]).toContain("image/jpeg");
+    expect((await response.body()).byteLength).toBeGreaterThan(200_000);
 
-  await goToRoom(page, "바다");
-  await expect(page.locator(".room-wellness .room-heading h1")).toHaveText("Ocean");
-  await page.waitForTimeout(320);
-  const oceanFrame = await canvas.screenshot();
-
-  expect(homeFrame.equals(kitchenFrame)).toBe(false);
-  expect(kitchenFrame.equals(oceanFrame)).toBe(false);
-  expect(homeFrame.equals(oceanFrame)).toBe(false);
+    await goToRoom(page, label);
+    await expect(page.locator(`.room-${asset === "workout" ? "game-room" : asset} .room-heading h1`)).toHaveText(heading);
+    await page.waitForTimeout(360);
+    const frame = await canvas.screenshot();
+    expect(frame.equals(frames.at(-1)!)).toBe(false);
+    frames.push(frame);
+  }
 });
 
 test("Ocean Games 보드는 일곱 게임을 보여주고 생태 구간을 순서대로 연다", async ({ page }) => {

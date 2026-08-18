@@ -8,6 +8,11 @@ export class BootScene extends Phaser.Scene {
 
   preload(): void {
     this.load.image("ocean-beach-photoreal", "/assets/ocean-beach-photoreal-v1.jpg");
+    this.load.image("kitchen-photoreal", "/assets/kitchen-photoreal-v1.jpg");
+    this.load.image("bathroom-photoreal", "/assets/bathroom-photoreal-v1.jpg");
+    this.load.image("bedroom-photoreal", "/assets/bedroom-photoreal-v1.jpg");
+    this.load.image("wardrobe-photoreal", "/assets/wardrobe-photoreal-v1.jpg");
+    this.load.image("workout-photoreal", "/assets/workout-photoreal-v1.jpg");
   }
 
   create(): void {
