@@ -153,7 +153,7 @@ test("일곱 공간 내비게이션과 Home 전용 간결한 화면 구성을 �
   }
 });
 
-test("생활 공간 다섯 곳이 고해상도 실사 배경으로 교체되고 방 이동에 맞춰 표시된다", async ({ page }) => {
+test("생활 공간 다섯 곳이 고해상도 게임 배경으로 교체되고 방 이동에 맞춰 표시된다", async ({ page }) => {
   await createKeeper(page, "장면검사");
   const canvas = page.locator("canvas");
   const roomAssets = [
@@ -166,7 +166,7 @@ test("생활 공간 다섯 곳이 고해상도 실사 배경으로 교체되고 
   const frames: Buffer[] = [await canvas.screenshot()];
 
   for (const [label, asset, heading] of roomAssets) {
-    const response = await page.request.get(`/assets/${asset}-photoreal-v1.jpg`);
+    const response = await page.request.get(`/assets/${asset}-game-v2.jpg`);
     expect(response.ok()).toBe(true);
     expect(response.headers()["content-type"]).toContain("image/jpeg");
     expect((await response.body()).byteLength).toBeGreaterThan(200_000);
@@ -183,7 +183,7 @@ test("생활 공간 다섯 곳이 고해상도 실사 배경으로 교체되고 
 test("Ocean Games 보드는 일곱 게임을 보여주고 생태 구간을 순서대로 연다", async ({ page }) => {
   await createKeeper(page, "파도");
   await goToRoom(page, "바다");
-  const beachAsset = await page.request.get("/assets/ocean-beach-photoreal-v1.jpg");
+  const beachAsset = await page.request.get("/assets/ocean-beach-game-v2.jpg");
   expect(beachAsset.ok()).toBe(true);
   expect(beachAsset.headers()["content-type"]).toContain("image/jpeg");
 

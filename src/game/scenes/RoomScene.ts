@@ -52,7 +52,7 @@ export class RoomScene extends Phaser.Scene {
       this.oceanMode = initial.oceanMode ?? "exploration";
       this.oceanZone = initial.oceanZone ?? "beach";
     }
-    this.backgroundImage = this.add.image(195, 350, "ocean-beach-photoreal").setDisplaySize(390, 700).setDepth(-2).setVisible(false);
+    this.backgroundImage = this.add.image(195, 350, "ocean-beach-game").setDisplaySize(390, 700).setDepth(-2).setVisible(false);
     this.background = this.add.graphics().setDepth(-1);
     this.keeper = new Keeper(this, 195, 405, this.style).setDepth(3);
     this.keeper.setReducedMotion(this.reducedMotion);
@@ -208,9 +208,9 @@ export class RoomScene extends Phaser.Scene {
   }
 
   private drawKitchen(g: Phaser.GameObjects.Graphics): void {
-    this.showPhotorealBackground("kitchen-photoreal");
+    this.showGameBackground("kitchen-game");
     this.drawPhotoReadability(g, 0x173d48, 0.08);
-    this.addPhotorealAmbience("kitchen");
+    this.addStylizedRoomAmbience("kitchen");
   }
 
   private drawOcean(g: Phaser.GameObjects.Graphics): void {
@@ -227,7 +227,7 @@ export class RoomScene extends Phaser.Scene {
   }
 
   private drawOceanBeach(g: Phaser.GameObjects.Graphics): void {
-    this.backgroundImage?.setVisible(true);
+    this.showGameBackground("ocean-beach-game");
     g.fillStyle(0x05324c, 0.08).fillRect(0, 0, 390, 120);
     g.fillStyle(0x173d48, 0.13).fillEllipse(286, 456, 94, 17);
   }
@@ -306,30 +306,30 @@ export class RoomScene extends Phaser.Scene {
   }
 
   private drawBathroom(g: Phaser.GameObjects.Graphics): void {
-    this.showPhotorealBackground("bathroom-photoreal");
+    this.showGameBackground("bathroom-game");
     this.drawPhotoReadability(g, 0x1d5a60, 0.07);
-    this.addPhotorealAmbience("bathroom");
+    this.addStylizedRoomAmbience("bathroom");
   }
 
   private drawBedroom(g: Phaser.GameObjects.Graphics): void {
-    this.showPhotorealBackground("bedroom-photoreal");
+    this.showGameBackground("bedroom-game");
     this.drawPhotoReadability(g, 0x07182e, 0.14);
-    this.addPhotorealAmbience("bedroom");
+    this.addStylizedRoomAmbience("bedroom");
   }
 
   private drawCloset(g: Phaser.GameObjects.Graphics): void {
-    this.showPhotorealBackground("wardrobe-photoreal");
+    this.showGameBackground("wardrobe-game");
     this.drawPhotoReadability(g, 0x4a2d1b, 0.08);
-    this.addPhotorealAmbience("wardrobe");
+    this.addStylizedRoomAmbience("wardrobe");
   }
 
   private drawWorkout(g: Phaser.GameObjects.Graphics): void {
-    this.showPhotorealBackground("workout-photoreal");
+    this.showGameBackground("workout-game");
     this.drawPhotoReadability(g, 0x082e39, 0.09);
-    this.addPhotorealAmbience("workout");
+    this.addStylizedRoomAmbience("workout");
   }
 
-  private showPhotorealBackground(texture: string): void {
+  private showGameBackground(texture: string): void {
     this.backgroundImage?.setTexture(texture).setDisplaySize(390, 700).clearTint().setVisible(true);
   }
 
@@ -338,7 +338,7 @@ export class RoomScene extends Phaser.Scene {
     g.fillStyle(0x06191e, 0.09).fillEllipse(195, 548, 204, 46);
   }
 
-  private addPhotorealAmbience(room: "kitchen" | "bathroom" | "bedroom" | "wardrobe" | "workout"): void {
+  private addStylizedRoomAmbience(room: "kitchen" | "bathroom" | "bedroom" | "wardrobe" | "workout"): void {
     const palettes = {
       kitchen: [0xfff1c2, 0xffffff],
       bathroom: [0xe8ffff, 0xbbe9e7],
