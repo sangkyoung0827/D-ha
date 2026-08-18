@@ -16,6 +16,8 @@ Zustand의 `GameStore`는 version 4 `GameSave`와 화면 런타임 상태를 결
 
 저장 정본은 IndexedDB이며 즉시 새로고침 경합을 막기 위한 동기 localStorage 미러가 있습니다. 로드 시 둘 다 Zod로 검증하고 더 최근의 `lastSavedAt`을 선택합니다. v1/v2/v3는 안경 기본값을 채운 v4로 마이그레이션하며, 손상 입력은 안전한 기본 저장과 원문 백업을 반환합니다.
 
+PWA는 `autoUpdate`, `skipWaiting`, `clientsClaim`, `cleanupOutdatedCaches`를 사용해 `d-ha.vercel.app`의 새 빌드를 자동 활성화합니다. 이 과정은 IndexedDB 게임 저장을 삭제하지 않고 앱 셸 캐시만 교체합니다.
+
 ## 게임 이벤트
 
 ```text

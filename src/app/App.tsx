@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { registerSW } from "virtual:pwa-register";
 import { GameCanvas } from "../game/GameCanvas";
 import { gameBridge } from "../game/bridge/GameBridge";
@@ -43,14 +43,11 @@ export function App() {
   const [pendingResult, setPendingResult] = useState<MiniGameResult | null>(null);
   const [oceanMode, setOceanMode] = useState<OceanMode>("exploration");
   const [oceanZone, setOceanZone] = useState<OceanZoneId>("beach");
-  const [updateReady, setUpdateReady] = useState(false);
-  const updateServiceWorker = useRef<((reloadPage?: boolean) => Promise<void>) | null>(null);
   const debug = new URLSearchParams(window.location.search).get("debug") === "1";
 
   useEffect(() => { if (!useGameStore.getState().hydrated) void hydrate(); }, [hydrate]);
   useEffect(() => {
-    const update = registerSW({ onNeedRefresh: () => setUpdateReady(true) });
-    updateServiceWorker.current = update;
+    registerSW({ immediate: true });
   }, []);
   useEffect(() => {
     if (!toast) return;
@@ -117,7 +114,6 @@ export function App() {
       <OverlayHost />
       {debug && <DebugPanel />}
       {toast && <div className="toast" role="status">{toast}</div>}
-      {updateReady && <div className="update-banner" role="status"><span><strong>새로운 디하 업데이트가 도착했어요.</strong>안전하게 업데이트할 수 있습니다.</span><button onClick={() => void updateServiceWorker.current?.(true)}>업데이트</button></div>}
       {recoveryMessage && <div className="recovery-dialog" role="alertdialog" aria-modal="true"><h2>저장 데이터 복구 안내</h2><p>{recoveryMessage}</p><div>{recoveryBackup && <button onClick={() => downloadText(recoveryBackup, "diha-corrupt-backup.json")}>손상 데이터 백업</button>}<button className="danger-button" onClick={() => void resetGame()}>새 게임 시작</button></div></div>}
     </div>
   );

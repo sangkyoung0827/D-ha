@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "prompt",
+      registerType: "autoUpdate",
       includeAssets: ["icon.svg"],
       manifest: {
         name: "D ha · 디하",
@@ -24,6 +24,9 @@ export default defineConfig({
         ]
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         globPatterns: ["**/*.{js,css,html,svg,jpg,jpeg,webmanifest}"],
         navigateFallback: "/index.html",
         runtimeCaching: [
