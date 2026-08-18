@@ -18,9 +18,9 @@ export interface SocialProvider {
 }
 
 const FRIENDS: GameFriend[] = [
-  { id: "nami", name: "나미", rank: "Coast Keeper", outfitColor: "#ef8f7c", theme: "코랄 스테이션", note: "데모 친구" },
-  { id: "sol", name: "솔", rank: "Reef Keeper", outfitColor: "#5bcac2", theme: "라군 데크", note: "데모 친구" },
-  { id: "mio", name: "미오", rank: "Rookie Keeper", outfitColor: "#6f8fce", theme: "미드나이트 돔", note: "데모 친구" }
+  { id: "nami", name: "나미", rank: "Coast Diha", outfitColor: "#ef8f7c", theme: "코랄 스테이션", note: "데모 친구" },
+  { id: "sol", name: "솔", rank: "Reef Diha", outfitColor: "#5bcac2", theme: "라군 데크", note: "데모 친구" },
+  { id: "mio", name: "미오", rank: "Rookie Diha", outfitColor: "#6f8fce", theme: "미드나이트 돔", note: "데모 친구" }
 ];
 
 export class LocalSocialProvider implements SocialProvider {

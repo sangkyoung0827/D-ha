@@ -16,14 +16,14 @@ export const ITEM_CATALOG: ItemDefinition[] = [
   { id: "well-style", category: "wellness", name: "스타일 체인지 토닉", description: "옷장으로 이동하는 게임 아이템", price: 90, requiredLevel: 5, effects: { joy: 8 }, color: "#a890df", symbol: "✧" },
   { id: "well-growth", category: "wellness", name: "성장 프리뷰 캡슐", description: "다음 해금을 미리 보여줘요", price: 110, requiredLevel: 7, effects: { joy: 10 }, color: "#6c9ee8", symbol: "◇" },
 
-  { id: "top-rookie", category: "top", name: "루키 재킷", description: "기본 Keeper 재킷", price: 0, requiredLevel: 1, wearableSlot: "top", color: "#f4c95d", symbol: "▱" },
+  { id: "top-rookie", category: "top", name: "화이트 반팔 티셔츠", description: "디하의 산뜻한 기본 반팔", price: 0, requiredLevel: 1, wearableSlot: "top", color: "#f7f7f2", symbol: "▱" },
   { id: "top-coast", category: "top", name: "코스트 셔츠", description: "바람이 통하는 셔츠", price: 140, requiredLevel: 2, wearableSlot: "top", color: "#65c7c1", symbol: "▱" },
   { id: "top-reef", category: "top", name: "리프 베스트", description: "산호 조사용 베스트", price: 190, requiredLevel: 4, wearableSlot: "top", color: "#ef8576", symbol: "▱" },
   { id: "top-current", category: "top", name: "커런트 후디", description: "파도선이 있는 후디", price: 230, requiredLevel: 6, wearableSlot: "top", color: "#508cdb", symbol: "▱" },
   { id: "top-dawn", category: "top", name: "던 키퍼 코트", description: "새벽 탐사용 코트", price: 310, requiredLevel: 8, wearableSlot: "top", color: "#7a7eb7", symbol: "▱" },
   { id: "top-deep", category: "top", name: "딥씨 점퍼", description: "깊은 바다색 점퍼", price: 390, requiredLevel: 10, wearableSlot: "top", color: "#183e66", symbol: "▱" },
 
-  { id: "bottom-sand", category: "bottom", name: "샌드 팬츠", description: "편안한 기본 바지", price: 0, requiredLevel: 1, wearableSlot: "bottom", color: "#d7b982", symbol: "∪" },
+  { id: "bottom-sand", category: "bottom", name: "클래식 청바지", description: "디하의 편안한 기본 데님", price: 0, requiredLevel: 1, wearableSlot: "bottom", color: "#4773a5", symbol: "∪" },
   { id: "bottom-tide", category: "bottom", name: "타이드 쇼츠", description: "활동적인 반바지", price: 120, requiredLevel: 3, wearableSlot: "bottom", color: "#4ea8b8", symbol: "∪" },
   { id: "bottom-reef", category: "bottom", name: "리프 카고", description: "도구 주머니가 있는 바지", price: 210, requiredLevel: 6, wearableSlot: "bottom", color: "#608f7b", symbol: "∪" },
   { id: "bottom-night", category: "bottom", name: "나이트 다이브 팬츠", description: "야간 탐사용 바지", price: 300, requiredLevel: 9, wearableSlot: "bottom", color: "#263d5d", symbol: "∪" },

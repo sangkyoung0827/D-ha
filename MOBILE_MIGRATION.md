@@ -16,7 +16,7 @@
 
 ## PWA 저장 데이터 이동
 
-웹 v3 저장을 JSON으로 내보내고 Zod 검증 후 네이티브 Preferences/SQLite에 원자적으로 기록합니다. 최초 실행 시 WebView의 IndexedDB와 localStorage 미러를 읽어 `lastSavedAt`이 최신인 데이터를 선택하고, 성공 확인 전 원본을 삭제하지 않습니다. 향후 스키마도 `version`별 순차 migration을 유지합니다.
+웹 v4 저장을 JSON으로 내보내고 Zod 검증 후 네이티브 Preferences/SQLite에 원자적으로 기록합니다. 최초 실행 시 WebView의 IndexedDB와 localStorage 미러를 읽어 `lastSavedAt`이 최신인 데이터를 선택하고, 성공 확인 전 원본을 삭제하지 않습니다. 향후 스키마도 `version`별 순차 migration을 유지합니다.
 
 ## 플랫폼 교체
 
@@ -27,7 +27,7 @@
 
 ## 앱스토어 전 체크리스트
 
-- Android/iOS 실기기에서 신규·업데이트 설치와 v3 저장 이동
+- Android/iOS 실기기에서 신규·업데이트 설치와 v3→v4 저장 이동
 - 오프라인 시작, 날짜·시간대 변경, 24시간 상한, 앱 종료 중 저장
 - 마이크·알림 권한의 허용·거절·설정 복귀
 - safe area, 390×844 및 소형 화면, 키보드·스크린리더

@@ -2,14 +2,25 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function createKeeper(page: Page, name = "마루") {
   await page.goto("/?debug=1");
-  await page.getByRole("button", { name: "나의 Keeper 만들기" }).click();
+  await expect(page).toHaveTitle(/D ha · 디하/);
+  await expect(page.getByRole("img", { name: "선글라스를 쓰고 손을 흔들며 인사하는 알약 디하" })).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("안녕!");
+  await page.getByRole("button", { name: "디하 시작하기" }).click();
   await page.getByLabel("캐릭터 이름").fill(name);
-  await page.getByRole("button", { name: "cocoa" }).click();
-  await page.getByRole("button", { name: "bun" }).click();
+  await page.getByTestId("appearance-cocoa").click();
+  await page.getByTestId("appearance-bun").click();
+  await page.getByTestId("appearance-silver").click();
+  await page.getByTestId("appearance-round").click();
+  await expect(page.getByTestId("character-preview")).toHaveAttribute("data-skin-tone", "cocoa");
+  await expect(page.getByTestId("character-preview")).toHaveAttribute("data-hair-style", "bun");
+  await expect(page.getByTestId("character-preview")).toHaveAttribute("data-hair-color", "silver");
+  await expect(page.getByTestId("character-preview")).toHaveAttribute("data-glasses-style", "round");
+  await expect(page.getByText("기본 복장 · 흰 반팔 + 청바지")).toBeVisible();
   await page.getByRole("button", { name: "이 모습으로 시작" }).click();
   await expect(page.getByText("돌보고, 놀고,")).toBeVisible();
   await page.getByRole("button", { name: /Home 입장/ }).click();
   await expect(page.getByTestId("game-shell")).toBeVisible();
+  await expect(page.locator(".phaser-host")).toHaveAttribute("aria-label", /코코아, 번, 실버 머리, 라운드/);
 }
 
 async function goToRoom(page: Page, room: string) {

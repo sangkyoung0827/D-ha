@@ -78,7 +78,7 @@ function addNotification(save: GameSave, notification: Omit<GameNotification, "i
 
 function saveFromStore(state: GameStore): GameSave {
   return {
-    version: 3,
+    version: 4,
     profile: state.profile,
     tutorialComplete: state.tutorialComplete,
     needs: state.needs,
@@ -133,7 +133,7 @@ function finalizeSave(next: GameSave, previous: GameSave, now = new Date()): Gam
       { ...finalized, coins: finalized.coins + (finalized.level - oldLevel) * 75 },
       {
         title: `Level ${finalized.level}`,
-        body: "새로운 Keeper 기능과 아이템이 해금됐어요.",
+        body: "새로운 디하 기능과 아이템이 해금됐어요.",
         kind: "level"
       },
       now
@@ -218,7 +218,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             { ...save, tutorialComplete: true, coins: save.coins + 80, xp: save.xp + 30 },
             { title: "튜토리얼 완료", body: "80 코인과 30 XP를 받았어요.", kind: "system" }
           ),
-        "Ocean Keeper 기초 훈련 완료!"
+        "디하 기초 안내 완료!"
       );
     },
 
@@ -246,7 +246,7 @@ export const useGameStore = create<GameStore>((set, get) => {
         const stats = { ...save.stats, careActions: save.stats.careActions + 1 };
         let dailyGoals = save.dailyGoals;
         let xpGain = earnsXp ? 14 : 3;
-        let message = "Keeper가 기분 좋게 반응했어요.";
+        let message = "디하가 기분 좋게 반응했어요.";
 
         if (kind === "feed") {
           const item = itemId ? ITEM_BY_ID[itemId] : undefined;

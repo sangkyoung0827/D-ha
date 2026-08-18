@@ -9,7 +9,7 @@ export function localDateKey(date = new Date()): string {
 
 export function createDailyGoals(): DailyGoal[] {
   return [
-    { id: "feed", label: "Keeper에게 음식 한 번 주기", progress: 0, target: 1, completed: false },
+    { id: "feed", label: "디하에게 음식 한 번 주기", progress: 0, target: 1, completed: false },
     { id: "wash", label: "청결 관리 한 번 하기", progress: 0, target: 1, completed: false },
     { id: "play", label: "미니게임 한 번 하기", progress: 0, target: 1, completed: false },
     { id: "balanced", label: "상태 세 개를 70 이상 만들기", progress: 0, target: 3, completed: false }

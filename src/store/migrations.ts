@@ -12,13 +12,14 @@ const needsSchema = z.object({
 
 const profileSchema = z.object({
   name: z.string().trim().min(1).max(20),
-  skinTone: z.enum(["sunrise", "sand", "cocoa", "deep"]),
-  hairStyle: z.enum(["wave", "crop", "bun", "curl"]),
-  hairColor: z.enum(["midnight", "coral", "chestnut", "silver"])
+  skinTone: z.enum(["porcelain", "sunrise", "sand", "golden", "cocoa", "deep"]),
+  hairStyle: z.enum(["straight", "wave", "crop", "side-part", "bob", "bun", "curl", "ponytail"]),
+  hairColor: z.enum(["midnight", "espresso", "chestnut", "caramel", "coral", "silver"]),
+  glassesStyle: z.enum(["none", "round", "square", "aviator"])
 });
 
 export const gameSaveSchema: z.ZodType<GameSave> = z.object({
-  version: z.literal(3),
+  version: z.literal(4),
   profile: profileSchema,
   tutorialComplete: z.boolean(),
   needs: needsSchema,
@@ -95,12 +96,20 @@ export function migrateSave(input: unknown, now = new Date()): RecoveryResult {
   if (input && typeof input === "object") {
     const legacy = input as Record<string, unknown>;
     const version = Number(legacy.version ?? 1);
-    if (version === 1 || version === 2) {
+    if (version === 1 || version === 2 || version === 3) {
       const base = createDefaultSave(now);
+      const legacyProfile = legacy.profile && typeof legacy.profile === "object"
+        ? legacy.profile as Partial<GameSave["profile"]>
+        : {};
       const merged: GameSave = {
         ...base,
         ...(legacy as Partial<GameSave>),
-        version: 3,
+        version: 4,
+        profile: {
+          ...base.profile,
+          ...legacyProfile,
+          glassesStyle: legacyProfile.glassesStyle ?? "none"
+        },
         settings: { ...base.settings, ...((legacy.settings as Partial<GameSave["settings"]>) ?? {}) },
         stats: { ...base.stats, ...((legacy.stats as Partial<GameSave["stats"]>) ?? {}) },
         lastSavedAt: typeof legacy.lastSavedAt === "string" ? legacy.lastSavedAt : now.toISOString()

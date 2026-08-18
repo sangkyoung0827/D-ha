@@ -1,5 +1,7 @@
 import Phaser from "phaser";
-import type { MiniGameResult } from "../../domain/types";
+import { hairColor, skinColor } from "../../domain/appearance";
+import { ITEM_BY_ID } from "../../domain/catalog";
+import type { GlassesStyle, HairStyle, MiniGameResult, SkinTone, HairColor } from "../../domain/types";
 import { OCEAN_GAME_BY_ID } from "../../domain/ocean";
 import { gameBridge } from "../bridge/GameBridge";
 import { applyHighDpiCamera } from "../renderQuality";
@@ -11,7 +13,9 @@ interface AthleteProfile {
   skin: number;
   hair: number;
   shirt: number;
-  hairStyle: "wave" | "crop" | "bun" | "curl";
+  pants: number;
+  hairStyle: HairStyle;
+  glassesStyle: GlassesStyle;
 }
 
 export class MiniGameScene extends Phaser.Scene {
@@ -367,22 +371,36 @@ export class MiniGameScene extends Phaser.Scene {
   }
 
   private playerProfile(): AthleteProfile {
-    return { name: "KEEPER", skin: 0xd99a72, hair: 0x183b4b, shirt: 0xffc75f, hairStyle: "wave" };
+    const presentation = this.registry.get("initial-presentation") as {
+      style?: { skinTone?: SkinTone; hairStyle?: HairStyle; hairColor?: HairColor; glassesStyle?: GlassesStyle; equipped?: { top?: string | null; bottom?: string | null } };
+    } | undefined;
+    const style = presentation?.style;
+    const topColor = style?.equipped?.top ? ITEM_BY_ID[style.equipped.top]?.color : undefined;
+    const bottomColor = style?.equipped?.bottom ? ITEM_BY_ID[style.equipped.bottom]?.color : undefined;
+    return {
+      name: "DIHA",
+      skin: this.hexColor(skinColor(style?.skinTone ?? "sand")),
+      hair: this.hexColor(hairColor(style?.hairColor ?? "midnight")),
+      shirt: this.hexColor(topColor ?? "#f7f7f2"),
+      pants: this.hexColor(bottomColor ?? "#4773a5"),
+      hairStyle: style?.hairStyle ?? "wave",
+      glassesStyle: style?.glassesStyle ?? "none"
+    };
   }
 
   private randomOpponentProfile(): AthleteProfile {
     return Phaser.Utils.Array.GetRandom<AthleteProfile>([
-      { name: "MIA", skin: 0xf0b087, hair: 0x704437, shirt: 0x5fc3b7, hairStyle: "bun" },
-      { name: "JUN", skin: 0xa96547, hair: 0x1d3541, shirt: 0xee806f, hairStyle: "crop" },
-      { name: "NOA", skin: 0x6d4234, hair: 0x282532, shirt: 0x718fd0, hairStyle: "curl" },
-      { name: "SORA", skin: 0xe2a17a, hair: 0x9c5049, shirt: 0x55b789, hairStyle: "wave" }
+      { name: "MIA", skin: 0xf0b087, hair: 0x704437, shirt: 0x5fc3b7, pants: 0x4c6d83, hairStyle: "bun", glassesStyle: "round" },
+      { name: "JUN", skin: 0xa96547, hair: 0x1d3541, shirt: 0xee806f, pants: 0x385b79, hairStyle: "crop", glassesStyle: "none" },
+      { name: "NOA", skin: 0x6d4234, hair: 0x282532, shirt: 0x718fd0, pants: 0x527060, hairStyle: "curl", glassesStyle: "square" },
+      { name: "SORA", skin: 0xe2a17a, hair: 0x9c5049, shirt: 0x55b789, pants: 0x3f658d, hairStyle: "ponytail", glassesStyle: "none" }
     ]);
   }
 
   private createAthlete(x: number, y: number, scale: number, profile: AthleteProfile, computer: boolean): Phaser.GameObjects.Container {
     const shadow = this.add.ellipse(0, 17, 68, 14, 0x274954, 0.18);
-    const legs = this.add.rectangle(-11, 3, 14, 35, 0x496d78).setOrigin(0.5, 0);
-    const otherLeg = this.add.rectangle(11, 3, 14, 35, 0x496d78).setOrigin(0.5, 0);
+    const legs = this.add.rectangle(-11, 3, 14, 35, profile.pants).setOrigin(0.5, 0);
+    const otherLeg = this.add.rectangle(11, 3, 14, 35, profile.pants).setOrigin(0.5, 0);
     const body = this.add.rectangle(0, -34, 52, 61, profile.shirt).setStrokeStyle(2, 0xffffff, 0.34);
     const neck = this.add.rectangle(0, -69, 12, 15, profile.skin);
     const head = this.add.circle(0, -88, 25, profile.skin).setStrokeStyle(2, 0xffffff, 0.3);
@@ -406,8 +424,29 @@ export class MiniGameScene extends Phaser.Scene {
       container.add(this.add.circle(-20, -101, 11, profile.hair));
       container.add(this.add.circle(20, -101, 11, profile.hair));
     }
+    if (profile.hairStyle === "bob") container.add([this.add.rectangle(-21, -91, 9, 34, profile.hair), this.add.rectangle(21, -91, 9, 34, profile.hair)]);
+    if (profile.hairStyle === "ponytail") container.add(this.add.ellipse(28, -94, 18, 43, profile.hair).setAngle(-18));
+    if (profile.hairStyle === "side-part") container.add(this.add.triangle(-5, -107, -22, -3, 20, -12, 18, 14, profile.hair));
+    this.addAthleteGlasses(container, profile.glassesStyle);
     container.setData("action-arm", actionArm).setData("action-leg", otherLeg);
     return container;
+  }
+
+  private addAthleteGlasses(container: Phaser.GameObjects.Container, style: GlassesStyle): void {
+    if (style === "none") return;
+    const rounded = style !== "square";
+    const left = rounded
+      ? this.add.circle(-9, -88, 7, 0xcce9e4, style === "aviator" ? 0.28 : 0.1).setStrokeStyle(2, 0x274751)
+      : this.add.rectangle(-9, -88, 15, 12, 0xcce9e4, 0.1).setStrokeStyle(2, 0x274751);
+    const right = rounded
+      ? this.add.circle(9, -88, 7, 0xcce9e4, style === "aviator" ? 0.28 : 0.1).setStrokeStyle(2, 0x274751)
+      : this.add.rectangle(9, -88, 15, 12, 0xcce9e4, 0.1).setStrokeStyle(2, 0x274751);
+    const bridge = this.add.rectangle(0, -88, 5, 2, 0x274751);
+    container.add([left, right, bridge]);
+  }
+
+  private hexColor(value: string): number {
+    return Phaser.Display.Color.HexStringToColor(value).color;
   }
 
   private swingAthlete(athlete?: Phaser.GameObjects.Container, computer = false, kick = false): void {

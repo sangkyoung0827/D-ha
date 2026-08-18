@@ -1,29 +1,13 @@
 import Phaser from "phaser";
+import { hairColor, skinColor } from "../../domain/appearance";
 import { ITEM_BY_ID } from "../../domain/catalog";
-import type { WearableSlot } from "../../domain/types";
+import type { CharacterAppearance, GlassesStyle, WearableSlot } from "../../domain/types";
 import { getRenderScale } from "../renderQuality";
-
-const SKIN_COLORS: Record<string, number> = {
-  sunrise: 0xf1b28c,
-  sand: 0xd99a72,
-  cocoa: 0xa96547,
-  deep: 0x6d4234
-};
-
-const HAIR_COLORS: Record<string, number> = {
-  midnight: 0x173847,
-  coral: 0xa64f48,
-  chestnut: 0x704437,
-  silver: 0xa9b9bf
-};
 
 const TOUCH_LINES = ["반가워!", "오늘 바다빛이 예뻐.", "무엇부터 해볼까?", "천천히 해도 좋아."];
 
-interface KeeperStyle {
+interface KeeperStyle extends CharacterAppearance {
   equipped: Record<WearableSlot, string | null>;
-  skinTone: string;
-  hairStyle: string;
-  hairColor: string;
 }
 
 export class Keeper extends Phaser.GameObjects.Container {
@@ -184,10 +168,10 @@ export class Keeper extends Phaser.GameObjects.Container {
   private draw(): void {
     this.graphics.clear();
     this.face.clear();
-    const skin = SKIN_COLORS[this.style.skinTone] ?? SKIN_COLORS.sand!;
-    const hair = HAIR_COLORS[this.style.hairColor] ?? HAIR_COLORS.midnight!;
-    const top = this.itemColor(this.style.equipped.top, 0xe2b95a);
-    const bottom = this.itemColor(this.style.equipped.bottom, 0x466a7b);
+    const skin = Phaser.Display.Color.HexStringToColor(skinColor(this.style.skinTone)).color;
+    const hair = Phaser.Display.Color.HexStringToColor(hairColor(this.style.hairColor)).color;
+    const top = this.itemColor(this.style.equipped.top, 0xf7f7f2);
+    const bottom = this.itemColor(this.style.equipped.bottom, 0x4773a5);
     const shoes = this.itemColor(this.style.equipped.shoes, 0xf4f0e6);
 
     this.graphics.fillStyle(0x173847, 0.13).fillEllipse(0, 157, 104, 18);
@@ -217,7 +201,9 @@ export class Keeper extends Phaser.GameObjects.Container {
     this.drawHair(hair);
     this.drawFace(this.pose === "sleeping");
 
-    if (this.style.equipped.accessory) {
+    if (this.style.glassesStyle !== "none") {
+      this.drawGlasses(this.style.glassesStyle, 0x274751);
+    } else if (this.style.equipped.accessory) {
       const accessory = ITEM_BY_ID[this.style.equipped.accessory];
       const color = Phaser.Display.Color.HexStringToColor(accessory?.color ?? "#d5f1ef").color;
       this.graphics.lineStyle(3, color, 0.94).strokeEllipse(-20, -137, 28, 19).strokeEllipse(20, -137, 28, 19).lineBetween(-6, -137, 6, -137);
@@ -230,6 +216,16 @@ export class Keeper extends Phaser.GameObjects.Container {
     if (style === "crop") {
       this.graphics.fillEllipse(0, -177, 96, 48).fillRoundedRect(-48, -177, 15, 43, 7).fillRoundedRect(33, -177, 15, 36, 7);
       this.graphics.fillTriangle(-38, -172, -14, -188, -4, -164).fillTriangle(-14, -176, 12, -190, 26, -164).fillTriangle(9, -177, 35, -184, 43, -158);
+    } else if (style === "straight") {
+      this.graphics.fillEllipse(0, -177, 101, 52).fillRoundedRect(-50, -175, 17, 61, 8).fillRoundedRect(33, -175, 17, 61, 8);
+      this.graphics.fillTriangle(-37, -174, -8, -193, 5, -165).fillTriangle(-10, -179, 19, -192, 37, -162);
+    } else if (style === "side-part") {
+      this.graphics.fillEllipse(0, -177, 101, 52).fillRoundedRect(-50, -170, 15, 44, 7).fillRoundedRect(35, -173, 15, 31, 7);
+      this.graphics.fillTriangle(-45, -168, 7, -197, 16, -163).fillTriangle(7, -191, 42, -179, 47, -153);
+      this.graphics.lineStyle(2, 0xffffff, 0.12).lineBetween(7, -195, 10, -166);
+    } else if (style === "bob") {
+      this.graphics.fillEllipse(0, -178, 104, 55).fillRoundedRect(-52, -176, 19, 80, 10).fillRoundedRect(33, -176, 19, 80, 10);
+      this.graphics.fillTriangle(-45, -174, -12, -194, 1, -163).fillTriangle(-9, -181, 22, -192, 43, -158);
     } else if (style === "bun") {
       this.graphics.fillCircle(0, -202, 16).fillEllipse(-4, -207, 24, 12);
       this.graphics.fillEllipse(0, -176, 101, 52).fillRoundedRect(-50, -176, 17, 48, 8).fillRoundedRect(33, -176, 17, 48, 8);
@@ -238,12 +234,31 @@ export class Keeper extends Phaser.GameObjects.Container {
       this.graphics.fillEllipse(0, -176, 102, 54);
       [-48, -44, -47, 44, 48, 45].forEach((x, index) => this.graphics.fillCircle(x, -160 + (index % 3) * 19, 14));
       this.graphics.fillCircle(-35, -183, 16).fillCircle(-12, -190, 16).fillCircle(13, -190, 16).fillCircle(36, -182, 16);
+    } else if (style === "ponytail") {
+      this.graphics.fillEllipse(52, -149, 35, 78).fillCircle(45, -178, 12);
+      this.graphics.fillEllipse(0, -177, 102, 54).fillRoundedRect(-50, -175, 16, 45, 8).fillRoundedRect(34, -175, 16, 35, 8);
+      this.graphics.fillTriangle(-43, -172, -10, -193, 3, -163).fillTriangle(-8, -180, 23, -191, 43, -159);
     } else {
       this.graphics.fillEllipse(0, -177, 104, 55).fillRoundedRect(-51, -177, 18, 53, 9).fillRoundedRect(33, -177, 18, 53, 9);
       this.graphics.fillCircle(-44, -145, 12).fillCircle(43, -145, 12);
       this.graphics.fillTriangle(-43, -176, -17, -194, -2, -166).fillTriangle(-18, -181, 9, -195, 25, -165).fillTriangle(8, -181, 36, -190, 44, -158);
     }
     this.graphics.fillStyle(0xffffff, 0.09).fillEllipse(-17, -188, 48, 13);
+  }
+
+  private drawGlasses(style: Exclude<GlassesStyle, "none">, color: number): void {
+    this.graphics.lineStyle(3, color, 0.96).lineBetween(-7, -138, 7, -138);
+    if (style === "round") {
+      this.graphics.strokeEllipse(-21, -138, 30, 23).strokeEllipse(21, -138, 30, 23);
+      return;
+    }
+    if (style === "square") {
+      this.graphics.strokeRoundedRect(-37, -149, 31, 23, 5).strokeRoundedRect(6, -149, 31, 23, 5);
+      return;
+    }
+    this.graphics.fillStyle(0x33525c, 0.17).fillEllipse(-21, -138, 33, 25).fillEllipse(21, -138, 33, 25);
+    this.graphics.strokeEllipse(-21, -138, 33, 25).strokeEllipse(21, -138, 33, 25);
+    this.graphics.lineStyle(2, 0xffffff, 0.23).lineBetween(-31, -144, -21, -147).lineBetween(11, -144, 21, -147);
   }
 
   private drawFace(blinking: boolean): void {

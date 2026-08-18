@@ -20,7 +20,7 @@ export const ACHIEVEMENTS: AchievementDefinition[] = [
   { id: "first-theme", title: "공간의 변화", description: "처음으로 방 테마를 바꿨어요.", coins: 70, xp: 35, check: (s) => s.stats.themeChanges >= 1 },
   { id: "streak-3", title: "다시 만난 세 번의 아침", description: "3일 연속 돌아왔어요.", coins: 120, xp: 55, check: (s) => s.loginStreak >= 3 },
   { id: "all-80", title: "균형 잡힌 하루", description: "모든 상태가 80 이상이에요.", coins: 120, xp: 60, check: (s) => [s.needs.satiety, s.needs.hygiene, s.needs.energy, s.needs.joy].every((v) => v >= 80) },
-  { id: "level-5", title: "Coast Keeper", description: "Level 5에 도달했어요.", coins: 150, xp: 0, check: (s) => s.level >= 5 },
+  { id: "level-5", title: "Coast Diha", description: "Level 5에 도달했어요.", coins: 150, xp: 0, check: (s) => s.level >= 5 },
   { id: "all-games", title: "생태 탐험가", description: "서로 다른 Ocean 게임 세 가지를 경험했어요.", coins: 180, xp: 80, check: (s) => new Set(s.stats.minigameIds).size >= 3 }
 ];
 

@@ -18,6 +18,8 @@ import {
 import { levelFromXp } from "../domain/progression";
 import { migrateSave, parseImportedSave } from "../store/migrations";
 import { isOceanGame, isOceanZoneUnlocked, oceanGameNeedEffects } from "../domain/ocean";
+import { GLASSES_STYLES, HAIR_COLORS, HAIR_STYLES, SKIN_TONES } from "../domain/appearance";
+import { ITEM_BY_ID } from "../domain/catalog";
 
 const start = new Date("2026-08-01T00:00:00.000Z");
 
@@ -102,6 +104,18 @@ describe("바다 생태계 진행", () => {
 });
 
 describe("진행 데이터", () => {
+  it("초기 디하는 세분화된 외형 선택과 흰 반팔·청바지 복장을 사용한다", () => {
+    const save = createDefaultSave(start);
+
+    expect(SKIN_TONES).toHaveLength(6);
+    expect(HAIR_STYLES).toHaveLength(8);
+    expect(HAIR_COLORS).toHaveLength(6);
+    expect(GLASSES_STYLES).toHaveLength(4);
+    expect(save.profile.glassesStyle).toBe("none");
+    expect(ITEM_BY_ID[save.equipped.top!]?.name).toBe("화이트 반팔 티셔츠");
+    expect(ITEM_BY_ID[save.equipped.bottom!]?.name).toBe("클래식 청바지");
+  });
+
   it("이미 열린 업적 보상을 중복 지급하지 않는다", () => {
     const base = createDefaultSave(start);
     const eligible = {
@@ -125,23 +139,31 @@ describe("진행 데이터", () => {
     expect(refreshed.goals.every((goal) => goal.progress === 0 && !goal.completed)).toBe(true);
   });
 
-  it("v1 저장 데이터를 현재 v3 스키마로 마이그레이션한다", () => {
-    const legacy = { ...createDefaultSave(start), version: 1, coins: 777 };
+  it("v3 저장 데이터를 안경 기본값이 있는 현재 v4 스키마로 마이그레이션한다", () => {
+    const current = createDefaultSave(start);
+    const legacyProfile = {
+      name: current.profile.name,
+      skinTone: current.profile.skinTone,
+      hairStyle: current.profile.hairStyle,
+      hairColor: current.profile.hairColor
+    };
+    const legacy = { ...current, version: 3, profile: legacyProfile, coins: 777 };
     const result = migrateSave(legacy, start);
 
     expect(result.status).toBe("migrated");
-    expect(result.save.version).toBe(3);
+    expect(result.save.version).toBe(4);
+    expect(result.save.profile.glassesStyle).toBe("none");
     expect(result.save.coins).toBe(777);
   });
 
   it("손상 저장 데이터는 백업과 안전한 새 저장을 제공한다", () => {
     const malformed = parseImportedSave("{not-json");
-    const invalid = migrateSave({ version: 3, coins: -10 }, start);
+    const invalid = migrateSave({ version: 4, coins: -10 }, start);
 
     expect(malformed.status).toBe("corrupt");
     expect(malformed.backup).toBe("{not-json");
     expect(invalid.status).toBe("corrupt");
-    expect(invalid.save.version).toBe(3);
+    expect(invalid.save.version).toBe(4);
     expect(invalid.save.coins).toBeGreaterThanOrEqual(0);
   });
 });

@@ -21,7 +21,7 @@ export function keeperRank(level: number): string {
   if (level >= 30) return "Deep Sea Guardian";
   if (level >= 20) return "Coral Researcher";
   if (level >= 15) return "Ocean Explorer";
-  if (level >= 10) return "Reef Keeper";
-  if (level >= 5) return "Coast Keeper";
-  return "Rookie Keeper";
+  if (level >= 10) return "Reef Diha";
+  if (level >= 5) return "Coast Diha";
+  return "Rookie Diha";
 }

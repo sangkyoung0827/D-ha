@@ -98,7 +98,7 @@ export function App() {
     setBathProgress(0);
   };
 
-  if (!hydrated) return <main className="loading-screen"><div className="loading-orbit" /><p>해안 연구소를 여는 중...</p></main>;
+  if (!hydrated) return <main className="loading-screen"><div className="loading-orbit" /><p>디하를 깨우는 중...</p></main>;
   if (!tutorialComplete) return <Onboarding />;
 
   return (
@@ -107,7 +107,7 @@ export function App() {
       <main className="game-shell" data-testid="game-shell">
         <StatusBar needs={needs} />
         <GameRoom room={currentRoom} keeperName={profile.name} immersive={Boolean(activeMiniGame)}>
-          <GameCanvas room={currentRoom} theme={roomTheme} equipped={equipped} skinTone={profile.skinTone} hairStyle={profile.hairStyle} hairColor={profile.hairColor} reducedMotion={settings.reducedMotion} oceanMode={oceanMode} oceanZone={oceanZone} activeMiniGame={activeMiniGame} onMiniGameFinish={handleMiniGameFinish} onBathComplete={handleBathComplete} onBathProgress={handleBathProgress} />
+          <GameCanvas room={currentRoom} theme={roomTheme} equipped={equipped} appearance={profile} reducedMotion={settings.reducedMotion} oceanMode={oceanMode} oceanZone={oceanZone} activeMiniGame={activeMiniGame} onMiniGameFinish={handleMiniGameFinish} onBathComplete={handleBathComplete} onBathProgress={handleBathProgress} />
           {!activeMiniGame && currentRoom !== "studio" && currentRoom !== "wellness" && <ContextTray room={currentRoom} bathProgress={bathProgress} />}
           {!activeMiniGame && currentRoom === "wellness" && <OceanHub mode={oceanMode} zone={oceanZone} highScores={highScores} onModeChange={setOceanMode} onZoneChange={setOceanZone} onStartGame={(id) => void startGame(id)} onOpenShop={() => setOverlay("shop")} />}
           {activeMiniGame && <MiniGameOverlay id={activeMiniGame} result={pendingResult} debug={debug} onClaim={claimReward} onExit={() => { const returnRoom = isOceanGame(activeMiniGame) ? "wellness" : "game-room"; setPendingResult(null); setActiveMiniGame(null); setRoom(returnRoom); }} />}
@@ -117,7 +117,7 @@ export function App() {
       <OverlayHost />
       {debug && <DebugPanel />}
       {toast && <div className="toast" role="status">{toast}</div>}
-      {updateReady && <div className="update-banner" role="status"><span><strong>새 해류 지도가 도착했어요.</strong>안전하게 업데이트할 수 있습니다.</span><button onClick={() => void updateServiceWorker.current?.(true)}>업데이트</button></div>}
+      {updateReady && <div className="update-banner" role="status"><span><strong>새로운 디하 업데이트가 도착했어요.</strong>안전하게 업데이트할 수 있습니다.</span><button onClick={() => void updateServiceWorker.current?.(true)}>업데이트</button></div>}
       {recoveryMessage && <div className="recovery-dialog" role="alertdialog" aria-modal="true"><h2>저장 데이터 복구 안내</h2><p>{recoveryMessage}</p><div>{recoveryBackup && <button onClick={() => downloadText(recoveryBackup, "diha-corrupt-backup.json")}>손상 데이터 백업</button>}<button className="danger-button" onClick={() => void resetGame()}>새 게임 시작</button></div></div>}
     </div>
   );

@@ -5,7 +5,8 @@ import { migrateSave, parseImportedSave, type RecoveryResult } from "./migration
 const DB_NAME = "diha-keeper";
 const STORE_NAME = "game-save";
 const SAVE_KEY = "primary";
-const LOCAL_MIRROR_KEY = "diha-keeper-primary-v3";
+const LOCAL_MIRROR_KEY = "diha-primary-v4";
+const LEGACY_LOCAL_MIRROR_KEYS = ["diha-keeper-primary-v3"] as const;
 let memoryFallback: GameSave | null = null;
 let databasePromise: Promise<IDBPDatabase> | null = null;
 
@@ -15,8 +16,11 @@ function canUseIndexedDb(): boolean {
 
 function loadLocalMirror(): RecoveryResult | null {
   try {
-    const raw = globalThis.localStorage?.getItem(LOCAL_MIRROR_KEY);
-    return raw ? parseImportedSave(raw) : null;
+    const keys = [LOCAL_MIRROR_KEY, ...LEGACY_LOCAL_MIRROR_KEYS];
+    return keys.reduce<RecoveryResult | null>((newest, key) => {
+      const raw = globalThis.localStorage?.getItem(key);
+      return newestResult(newest, raw ? parseImportedSave(raw) : null);
+    }, null);
   } catch {
     return null;
   }
@@ -25,6 +29,7 @@ function loadLocalMirror(): RecoveryResult | null {
 function saveLocalMirror(save: GameSave): void {
   try {
     globalThis.localStorage?.setItem(LOCAL_MIRROR_KEY, JSON.stringify(save));
+    for (const key of LEGACY_LOCAL_MIRROR_KEYS) globalThis.localStorage?.removeItem(key);
   } catch {
     // IndexedDB and the in-memory fallback remain available when storage is blocked.
   }
@@ -65,6 +70,7 @@ export async function clearGame(): Promise<void> {
   memoryFallback = null;
   try {
     globalThis.localStorage?.removeItem(LOCAL_MIRROR_KEY);
+    for (const key of LEGACY_LOCAL_MIRROR_KEYS) globalThis.localStorage?.removeItem(key);
   } catch {
     // Continue clearing the primary store.
   }

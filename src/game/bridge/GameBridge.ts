@@ -1,10 +1,10 @@
-import type { MiniGameResult, RoomId, WearableSlot } from "../../domain/types";
+import type { CharacterAppearance, MiniGameResult, RoomId, WearableSlot } from "../../domain/types";
 import type { OceanMode, OceanZoneId } from "../../domain/ocean";
 
 export interface BridgeEvents {
   "room:change": { room: RoomId; theme: string };
   "ocean:view": { mode: OceanMode; zone: OceanZoneId };
-  "keeper:style": { equipped: Record<WearableSlot, string | null>; skinTone: string; hairStyle: string; hairColor: string };
+  "keeper:style": CharacterAppearance & { equipped: Record<WearableSlot, string | null> };
   "keeper:react": { action: "feed" | "wash" | "sleep" | "wellness" | "play" | "level" };
   "settings:motion": { reduced: boolean };
   "bath:progress": { progress: number };

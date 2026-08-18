@@ -61,7 +61,7 @@ function FridgeOverlay() {
 
   return <>
     <header className="fridge-header">
-      <span aria-hidden="true">KEEPER KITCHEN</span>
+      <span aria-hidden="true">DIHA KITCHEN</span>
       <h2 id="sheet-title">냉장고</h2>
       <p><b>{ownedCount}</b>개의 신선한 식재료</p>
     </header>
@@ -86,7 +86,7 @@ function FridgeOverlay() {
         <span aria-hidden="true">＋</span><strong>식재료 추가</strong><small>상점</small>
       </button>
     </div>
-    <p className="fridge-help">음식을 누르면 Keeper에게 바로 먹일 수 있어요.</p>
+    <p className="fridge-help">음식을 누르면 디하에게 바로 먹일 수 있어요.</p>
   </>;
 }
 
@@ -132,13 +132,13 @@ function WardrobeOverlay() {
   const equip = useGameStore((state) => state.equip);
   const setTheme = useGameStore((state) => state.setTheme);
   const owned = ITEM_CATALOG.filter((item) => (inventory[item.id] ?? 0) > 0 && (item.wearableSlot || item.category === "theme"));
-  return <><SheetHeader eyebrow="KEEPER WARDROBE" title="스타일과 공간" copy="보유 아이템을 장착하고 세트를 영구 저장합니다." /><div className="wardrobe-grid">{owned.map((item) => { const active = item.wearableSlot ? equipped[item.wearableSlot] === item.id : item.themeId === roomTheme; return <button key={item.id} className={active ? "active" : ""} data-testid={`equip-${item.id}`} onClick={() => item.category === "theme" ? setTheme(item.id) : equip(item.id)}><i style={{ background: item.color }}>{item.symbol}</i><span><strong>{item.name}</strong><small>{active ? "현재 적용 중" : "적용하기"}</small></span></button>; })}</div></>;
+  return <><SheetHeader eyebrow="DIHA WARDROBE" title="스타일과 공간" copy="보유 아이템을 장착하고 세트를 영구 저장합니다." /><div className="wardrobe-grid">{owned.map((item) => { const active = item.wearableSlot ? equipped[item.wearableSlot] === item.id : item.themeId === roomTheme; return <button key={item.id} className={active ? "active" : ""} data-testid={`equip-${item.id}`} onClick={() => item.category === "theme" ? setTheme(item.id) : equip(item.id)}><i style={{ background: item.color }}>{item.symbol}</i><span><strong>{item.name}</strong><small>{active ? "현재 적용 중" : "적용하기"}</small></span></button>; })}</div></>;
 }
 
 function AchievementsOverlay() {
   const unlocked = useGameStore((state) => state.achievements);
   const unlockedMap = useMemo(() => new Map(unlocked.map((item) => [item.id, item])), [unlocked]);
-  return <><SheetHeader eyebrow="KEEPER LOG" title={`업적 ${unlocked.length}/${ACHIEVEMENTS.length}`} copy="보상은 달성 순간 한 번만 지급됩니다." /><div className="achievement-list">{ACHIEVEMENTS.map((achievement, index) => { const state = unlockedMap.get(achievement.id); return <article key={achievement.id} className={state ? "unlocked" : ""}><b>{state ? "✓" : String(index + 1).padStart(2, "0")}</b><span><strong>{achievement.title}</strong><small>{achievement.description}</small>{state && <em>{new Date(state.unlockedAt).toLocaleDateString("ko-KR")}</em>}</span><i>● {achievement.coins}</i></article>; })}</div></>;
+  return <><SheetHeader eyebrow="DIHA LOG" title={`업적 ${unlocked.length}/${ACHIEVEMENTS.length}`} copy="보상은 달성 순간 한 번만 지급됩니다." /><div className="achievement-list">{ACHIEVEMENTS.map((achievement, index) => { const state = unlockedMap.get(achievement.id); return <article key={achievement.id} className={state ? "unlocked" : ""}><b>{state ? "✓" : String(index + 1).padStart(2, "0")}</b><span><strong>{achievement.title}</strong><small>{achievement.description}</small>{state && <em>{new Date(state.unlockedAt).toLocaleDateString("ko-KR")}</em>}</span><i>● {achievement.coins}</i></article>; })}</div></>;
 }
 
 function DailyOverlay() {
@@ -152,7 +152,7 @@ function FriendsOverlay() {
   const greeted = useGameStore((state) => state.greetedFriends);
   const greet = useGameStore((state) => state.greetFriend);
   useEffect(() => { void socialProvider.listFriends().then(setFriends); }, []);
-  return <><SheetHeader eyebrow="LOCAL SOCIAL MOCK" title="Keeper 친구 공간" copy="실제 사용자가 아닌 아키텍처 검증용 데모 친구입니다." /><div className="friend-grid">{friends.map((friend) => <article key={friend.id}><div className="friend-avatar" style={{ background: friend.outfitColor }}><span /></div><span className="demo-tag">{friend.note}</span><h3>{friend.name}</h3><p>{friend.rank}<br />{friend.theme}</p><button disabled={Boolean(greeted[friend.id])} onClick={() => greet(friend.id)}>{greeted[friend.id] ? "오늘 인사 완료" : "방문하고 인사 · 30"}</button></article>)}</div></>;
+  return <><SheetHeader eyebrow="LOCAL SOCIAL MOCK" title="디하 친구 공간" copy="실제 사용자가 아닌 아키텍처 검증용 데모 친구입니다." /><div className="friend-grid">{friends.map((friend) => <article key={friend.id}><div className="friend-avatar" style={{ background: friend.outfitColor }}><span /></div><span className="demo-tag">{friend.note}</span><h3>{friend.name}</h3><p>{friend.rank}<br />{friend.theme}</p><button disabled={Boolean(greeted[friend.id])} onClick={() => greet(friend.id)}>{greeted[friend.id] ? "오늘 인사 완료" : "방문하고 인사 · 30"}</button></article>)}</div></>;
 }
 
 function NotificationsOverlay() {
@@ -174,7 +174,7 @@ function SettingsOverlay() {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `diha-keeper-save-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `diha-save-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
   };

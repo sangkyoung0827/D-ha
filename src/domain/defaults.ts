@@ -6,13 +6,14 @@ export const DEFAULT_PROFILE: CharacterProfile = {
   name: "마루",
   skinTone: "sand",
   hairStyle: "wave",
-  hairColor: "midnight"
+  hairColor: "midnight",
+  glassesStyle: "none"
 };
 
 export function createDefaultSave(now = new Date(), profile = DEFAULT_PROFILE): GameSave {
   const date = localDateKey(now);
   return {
-    version: 3,
+    version: 4,
     profile,
     tutorialComplete: false,
     needs: { satiety: 78, hygiene: 76, energy: 72, joy: 80, condition: 77 },

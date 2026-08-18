@@ -1,4 +1,4 @@
-# 향후 알고케어 통합 경계
+# 향후 디하 통합 경계
 
 현재 버전은 네트워크 계정이나 실제 웰니스·제품 데이터를 연결하지 않습니다. UI가 실제 연동처럼 보이지 않도록 모든 기본 구현은 `Mock` 또는 `Local demo`로 명시합니다.
 
@@ -17,7 +17,7 @@
 |---|---|---|
 | DHA 제품 QR·serving | ProductActivationProvider | 서명된 코드, 중복 활성화, 실제 구매와 게임 보상 분리 |
 | 섭취 루틴 | WellnessProvider 파생 DTO | 동의, 최소 수집, 게임 문구와 의료 판단 분리 |
-| 알고케어·웰니스 데이터 | WellnessProvider | 인증·철회·보존 기간·출처 표시 |
+| 디하·웰니스 데이터 | WellnessProvider | 인증·철회·보존 기간·출처 표시 |
 | 모바일 로컬 알림 | NotificationProvider | OS 권한, 시간대, 해제와 조용한 시간 |
 | 계정 동기화 | 새 SyncProvider | 로컬 우선 충돌 해결, 암호화, 탈퇴·내보내기 |
 | 실제 친구 | SocialProvider | 차단·신고·공개 범위·미성년자 안전 |

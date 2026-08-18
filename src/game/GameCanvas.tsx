@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { useEffect, useRef } from "react";
-import type { MiniGameResult, RoomId, WearableSlot } from "../domain/types";
+import { appearanceDescription } from "../domain/appearance";
+import type { CharacterAppearance, MiniGameResult, RoomId, WearableSlot } from "../domain/types";
 import { gameBridge } from "./bridge/GameBridge";
 import { GAME_HEIGHT, GAME_WIDTH, getRenderScale } from "./renderQuality";
 import { BootScene } from "./scenes/BootScene";
@@ -11,9 +12,7 @@ interface GameCanvasProps {
   room: RoomId;
   theme: string;
   equipped: Record<WearableSlot, string | null>;
-  skinTone: string;
-  hairStyle: string;
-  hairColor: string;
+  appearance: CharacterAppearance;
   reducedMotion: boolean;
   oceanMode: OceanMode;
   oceanZone: OceanZoneId;
@@ -29,7 +28,7 @@ export function GameCanvas(props: GameCanvasProps) {
   const presentationRef = useRef({
     room: props.room,
     theme: props.theme,
-    style: { equipped: props.equipped, skinTone: props.skinTone, hairStyle: props.hairStyle, hairColor: props.hairColor },
+    style: { equipped: props.equipped, ...props.appearance },
     reducedMotion: props.reducedMotion,
     oceanMode: props.oceanMode,
     oceanZone: props.oceanZone
@@ -63,12 +62,12 @@ export function GameCanvas(props: GameCanvasProps) {
     gameRef.current?.registry.set("initial-presentation", {
       room: props.room,
       theme: props.theme,
-      style: { equipped: props.equipped, skinTone: props.skinTone, hairStyle: props.hairStyle, hairColor: props.hairColor },
+      style: { equipped: props.equipped, ...props.appearance },
       reducedMotion: props.reducedMotion,
       oceanMode: props.oceanMode,
       oceanZone: props.oceanZone
     });
-  }, [props.room, props.theme, props.equipped, props.skinTone, props.hairStyle, props.hairColor, props.reducedMotion, props.oceanMode, props.oceanZone]);
+  }, [props.room, props.theme, props.equipped, props.appearance, props.reducedMotion, props.oceanMode, props.oceanZone]);
 
   useEffect(() => {
     gameBridge.emit("room:change", { room: props.room, theme: props.theme });
@@ -77,11 +76,9 @@ export function GameCanvas(props: GameCanvasProps) {
   useEffect(() => {
     gameBridge.emit("keeper:style", {
       equipped: props.equipped,
-      skinTone: props.skinTone,
-      hairStyle: props.hairStyle,
-      hairColor: props.hairColor
+      ...props.appearance
     });
-  }, [props.equipped, props.skinTone, props.hairStyle, props.hairColor]);
+  }, [props.equipped, props.appearance]);
 
   useEffect(() => {
     gameBridge.emit("settings:motion", { reduced: props.reducedMotion });
@@ -122,5 +119,5 @@ export function GameCanvas(props: GameCanvasProps) {
     };
   }, [props.activeMiniGame]);
 
-  return <div ref={hostRef} className="phaser-host" aria-label="Ocean Keeper 게임 화면" />;
+  return <div ref={hostRef} className="phaser-host" aria-label={`디하 게임 화면: ${appearanceDescription(props.appearance)}`} />;
 }

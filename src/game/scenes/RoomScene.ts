@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import type { RoomId, WearableSlot } from "../../domain/types";
+import type { CharacterAppearance, RoomId, WearableSlot } from "../../domain/types";
 import { gameBridge } from "../bridge/GameBridge";
 import { Keeper } from "../entities/Keeper";
 import { applyHighDpiCamera } from "../renderQuality";
@@ -8,7 +8,7 @@ import type { OceanMode, OceanZoneId } from "../../domain/ocean";
 interface RoomPresentation {
   room: RoomId;
   theme: string;
-  style: { equipped: Record<WearableSlot, string | null>; skinTone: string; hairStyle: string; hairColor: string };
+  style: CharacterAppearance & { equipped: Record<WearableSlot, string | null> };
   reducedMotion: boolean;
   oceanMode: OceanMode;
   oceanZone: OceanZoneId;
@@ -29,11 +29,12 @@ export class RoomScene extends Phaser.Scene {
   private lastPointer?: Phaser.Math.Vector2;
   private roomTransition?: Phaser.Time.TimerEvent;
   private cleanups: Array<() => void> = [];
-  private style: { equipped: Record<WearableSlot, string | null>; skinTone: string; hairStyle: string; hairColor: string } = {
+  private style: CharacterAppearance & { equipped: Record<WearableSlot, string | null> } = {
     equipped: { top: "top-rookie", bottom: "bottom-sand", shoes: "shoes-deck", accessory: null },
     skinTone: "sand",
     hairStyle: "wave",
-    hairColor: "midnight"
+    hairColor: "midnight",
+    glassesStyle: "none"
   };
 
   constructor() {

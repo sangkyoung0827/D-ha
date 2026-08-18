@@ -18,11 +18,20 @@ export interface NeedValues {
   condition: number;
 }
 
-export interface CharacterProfile {
+export type SkinTone = "porcelain" | "sunrise" | "sand" | "golden" | "cocoa" | "deep";
+export type HairStyle = "straight" | "wave" | "crop" | "side-part" | "bob" | "bun" | "curl" | "ponytail";
+export type HairColor = "midnight" | "espresso" | "chestnut" | "caramel" | "coral" | "silver";
+export type GlassesStyle = "none" | "round" | "square" | "aviator";
+
+export interface CharacterAppearance {
+  skinTone: SkinTone;
+  hairStyle: HairStyle;
+  hairColor: HairColor;
+  glassesStyle: GlassesStyle;
+}
+
+export interface CharacterProfile extends CharacterAppearance {
   name: string;
-  skinTone: "sunrise" | "sand" | "cocoa" | "deep";
-  hairStyle: "wave" | "crop" | "bun" | "curl";
-  hairColor: "midnight" | "coral" | "chestnut" | "silver";
 }
 
 export type ItemCategory =
@@ -117,7 +126,7 @@ export interface MiniGameResult {
 }
 
 export interface GameSave {
-  version: 3;
+  version: 4;
   profile: CharacterProfile;
   tutorialComplete: boolean;
   needs: NeedValues;
