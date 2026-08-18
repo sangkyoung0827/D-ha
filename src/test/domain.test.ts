@@ -17,6 +17,7 @@ import {
 } from "../domain/economy";
 import { levelFromXp } from "../domain/progression";
 import { migrateSave, parseImportedSave } from "../store/migrations";
+import { isOceanGame, isOceanZoneUnlocked, oceanGameNeedEffects } from "../domain/ocean";
 
 const start = new Date("2026-08-01T00:00:00.000Z");
 
@@ -81,6 +82,22 @@ describe("경제와 성장", () => {
     });
 
     expect(reward).toEqual({ coins: 180, xp: 90 });
+  });
+});
+
+describe("바다 생태계 진행", () => {
+  it("직전 생태 구간을 완주한 순서대로 다음 수심을 연다", () => {
+    expect(isOceanZoneUnlocked("beach", {})).toBe(true);
+    expect(isOceanZoneUnlocked("open-water", {})).toBe(false);
+    expect(isOceanZoneUnlocked("open-water", { "beach-volleyball": 120 })).toBe(true);
+    expect(isOceanZoneUnlocked("surf", { "beach-volleyball": 120 })).toBe(false);
+    expect(isOceanZoneUnlocked("surf", { "open-water-catch": 300 })).toBe(true);
+  });
+
+  it("바다 수영 포획 성공은 제품 없이 게임 속 DHA 상태 효과를 준다", () => {
+    const result = { gameId: "open-water-catch" as const, score: 500, success: true, durationMs: 38_000 };
+    expect(isOceanGame(result.gameId)).toBe(true);
+    expect(oceanGameNeedEffects(result)).toEqual({ satiety: 18, joy: 9, energy: -6 });
   });
 });
 

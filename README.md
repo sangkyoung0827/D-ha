@@ -1,13 +1,19 @@
 # 알고케어
 
-사람 형태의 `Ocean Keeper`와 일상을 돌보는 모바일 우선 로컬 게임입니다. 다섯 상태를 살피고, 7개 공간을 오가며, 세 미니게임으로 코인과 경험치를 얻습니다. 의료 서비스나 실제 웰니스 연동처럼 보이지 않도록 게임 시스템과 미래 통합 경계를 분리했습니다.
+사람 형태의 `Ocean Keeper`와 일상을 돌보는 모바일 우선 로컬 게임입니다. 다섯 상태를 살피고 7개 공간을 오가며, Ocean의 연속된 바다 생태계를 탐험해 코인과 경험치를 얻습니다. 의료 서비스나 실제 웰니스 연동처럼 보이지 않도록 게임 시스템과 미래 통합 경계를 분리했습니다.
 
 ## 현재 구현 범위
 
 - 이름·피부 톤·머리 모양·머리 색상을 고르는 온보딩과 튜토리얼
 - 포만감·청결·에너지·즐거움·컨디션의 시간 경과 및 최대 24시간 오프라인 계산
-- Home, Kitchen, Ocean, Bathroom, Bedroom, Closet, Workout의 7개 공간과 방별 Context Tray
-- Bubble Focus, Current Run, Reef Memory 실제 플레이 및 지연 로딩
+- Home, Kitchen, Ocean, Bathroom, Bedroom, Closet, Workout의 7개 공간과 Ocean 전용 탐험 허브
+- 밥·영양제·운동·에너지 4개 현재 상태만 표시하는 HUD와 자연스러운 인체 비율·호흡·눈깜빡임을 갖춘 Keeper
+- 기기 픽셀 비율을 최대 2배까지 반영하는 HiDPI Phaser 렌더링과 고해상도 텍스트·파티클
+- 해변→바다 수영→서핑보드→해저 동굴→심해로 이어지는 5단계 생태 진행과 7개 Ocean 게임
+- 실제 해변 사진의 구도와 질감을 참고해 새로 생성한 2× 해상도 전용 백사장·청록 바다 배경
+- 상시 패널 대신 서핑보드 `Games`, 점포형 `상점`, 오픈카 `해안도로`만 표시하는 Ocean 하단 퀵 메뉴
+- 필요할 때만 여는 3열 Games 보드와 직전 구간 완주로 열리는 수심 진행
+- 물고기를 직접 잡으면 제품 없이 게임 속 DHA 섭취 효과가 포만·컨디션에 반영되는 바다 수영
 - 코인, XP, 레벨, 해금, 39개 아이템, 의상 장착, 4개 방 테마
 - 12개 업적, 일일 목표, 연속 방문, 로컬 데모 친구
 - IndexedDB 저장, 동기 localStorage 미러, Zod 검증, v1/v2 마이그레이션, JSON 내보내기·가져오기
@@ -42,8 +48,8 @@ E2E 최초 실행 전 Chromium이 없다면 `pnpm exec playwright install chromi
 
 - 화면 아래 통합 line icon 메뉴로 7개 공간을 이동합니다.
 - 주방에서 보유 음식을 선택하고, 욕실 Canvas에서 Keeper를 드래그하거나 빠른 씻기 버튼을 사용합니다.
-- Bedroom은 수면, Ocean은 가상 전환 아이템, Closet은 의상 관리를 담당합니다. 글로벌 상점 대신 각 방의 Context Tray에서 해당 카테고리만 표시합니다.
-- Workout에서 기존 세 게임을 선택합니다. Current Run은 좌우 화살표·스와이프·화면 외부 버튼을 모두 지원합니다.
+- Home은 행동 바 없이 Keeper와 바다 전망·실내 식물에 집중합니다. Bedroom은 수면, Closet은 의상 관리를 담당하며 나머지 방은 Context Tray에서 관련 카테고리를 표시합니다.
+- Ocean의 바다 탐험에서 해변 3종, 수영 포획, 상어 회피 서핑, 소나 동굴, 심해 하강을 선택합니다. 레인 게임은 좌우 화살표·스와이프·화면 외부 버튼을 모두 지원합니다.
 - Keeper를 터치하면 표정, 대사, 작은 모션으로 반응합니다.
 
 ## 주요 폴더 구조
@@ -80,9 +86,10 @@ Production 또는 로컬 HTTPS 환경에서 브라우저의 “앱 설치” 메
 
 - 백엔드, 계정 동기화, 실제 사용자 친구, 서버 Push는 없습니다.
 - 음성 에코는 브라우저 `MediaRecorder`와 Web Audio 지원 범위에서만 동작하며 녹음을 저장하지 않습니다.
-- Phaser가 초기 게임 화면에 필요해 vendor 청크가 크지만, 세 미니게임 Scene과 정의는 최초 진입 전까지 별도 청크로 지연 로딩합니다.
+- Phaser가 초기 게임 화면에 필요해 vendor 청크가 크지만, 미니게임 Scene과 정의는 최초 진입 전까지 별도 청크로 지연 로딩합니다.
+- 해안도로는 Ocean에서 바다 탐험과 분리된 두 번째 트랙으로 자리만 마련했으며, 차량·조작·코스는 다음 설계 입력 이후 구현합니다.
 - 웰니스·제품 활성화는 명시적인 Mock Provider이며 실제 제품·의료 효능을 뜻하지 않습니다.
 
 ## 향후 알고케어 확장
 
-QR 제품 활성화, serving 수량, 섭취 루틴, 알고케어·웰니스 데이터, 모바일 로컬 알림, 계정 동기화, 실제 친구, 바다 생태계 탐험은 `src/platform` 인터페이스 뒤에서 교체합니다. 세부 경계는 [INTEGRATION_BOUNDARIES.md](./INTEGRATION_BOUNDARIES.md), 모바일 전환은 [MOBILE_MIGRATION.md](./MOBILE_MIGRATION.md)를 참고합니다.
+QR 제품 활성화, serving 수량, 섭취 루틴, 알고케어·웰니스 데이터, 모바일 로컬 알림, 계정 동기화, 실제 친구는 `src/platform` 인터페이스 뒤에서 교체합니다. 세부 경계는 [INTEGRATION_BOUNDARIES.md](./INTEGRATION_BOUNDARIES.md), 모바일 전환은 [MOBILE_MIGRATION.md](./MOBILE_MIGRATION.md)를 참고합니다.

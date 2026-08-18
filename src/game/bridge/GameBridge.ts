@@ -1,18 +1,23 @@
 import type { MiniGameResult, RoomId, WearableSlot } from "../../domain/types";
+import type { OceanMode, OceanZoneId } from "../../domain/ocean";
 
 export interface BridgeEvents {
   "room:change": { room: RoomId; theme: string };
-  "keeper:style": { equipped: Record<WearableSlot, string | null>; skinTone: string; hairColor: string };
+  "ocean:view": { mode: OceanMode; zone: OceanZoneId };
+  "keeper:style": { equipped: Record<WearableSlot, string | null>; skinTone: string; hairStyle: string; hairColor: string };
   "keeper:react": { action: "feed" | "wash" | "sleep" | "wellness" | "play" | "level" };
   "settings:motion": { reduced: boolean };
   "bath:progress": { progress: number };
   "bath:complete": undefined;
+  "kitchen:fridge-open": undefined;
   "minigame:start": { id: MiniGameResult["gameId"] };
   "minigame:finish": MiniGameResult;
   "minigame:pause": undefined;
   "minigame:resume": undefined;
   "minigame:restart": undefined;
   "minigame:move": { direction: -1 | 1 };
+  "minigame:action": undefined;
+  "minigame:progress": { gameId: MiniGameResult["gameId"]; score: number; playerPoints: number; computerPoints: number };
   "minigame:demo-finish": undefined;
 }
 

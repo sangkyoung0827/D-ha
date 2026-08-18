@@ -4,7 +4,7 @@ import type { GameIconName } from "../icons/GameIcon";
 export const VISIBLE_ROOMS: Array<{ id: RoomId; label: string; shortLabel: string; icon: GameIconName; tray: string }> = [
   { id: "studio", label: "홈", shortLabel: "Home", icon: "home", tray: "Home" },
   { id: "kitchen", label: "주방", shortLabel: "Kitchen", icon: "kitchen", tray: "Kitchen" },
-  { id: "wellness", label: "바다", shortLabel: "Ocean", icon: "ocean", tray: "Ocean Tools" },
+  { id: "wellness", label: "바다", shortLabel: "Ocean", icon: "ocean", tray: "Ocean Expedition" },
   { id: "bathroom", label: "욕실", shortLabel: "Bath", icon: "bath", tray: "Bath Items" },
   { id: "bedroom", label: "침실", shortLabel: "Sleep", icon: "sleep", tray: "Sleep Items" },
   { id: "wardrobe", label: "옷장", shortLabel: "Closet", icon: "closet", tray: "Wardrobe" },

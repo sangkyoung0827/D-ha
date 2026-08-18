@@ -97,8 +97,20 @@ export interface GameReward {
   xp: number;
 }
 
+export type MiniGameId =
+  | "bubble-focus"
+  | "current-run"
+  | "reef-memory"
+  | "beach-volleyball"
+  | "beach-pingpong"
+  | "beach-football"
+  | "open-water-catch"
+  | "reef-surf"
+  | "cave-sonar"
+  | "deepsea-descent";
+
 export interface MiniGameResult {
-  gameId: "bubble-focus" | "current-run" | "reef-memory";
+  gameId: MiniGameId;
   score: number;
   success: boolean;
   durationMs: number;

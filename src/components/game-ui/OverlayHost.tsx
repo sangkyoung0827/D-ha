@@ -2,10 +2,13 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { ACHIEVEMENTS } from "../../domain/achievements";
 import { ITEM_CATALOG } from "../../domain/catalog";
 import type { ItemCategory, RoomId } from "../../domain/types";
+import { gameBridge } from "../../game/bridge/GameBridge";
+import { playFeedbackTone, vibrateFeedback } from "../../platform/audio/feedback";
 import { notificationProvider } from "../../platform/notification/NotificationProvider";
 import { socialProvider, type GameFriend } from "../../platform/social/SocialProvider";
 import { useGameStore } from "../../store/gameStore";
 import { VoiceEchoPanel } from "../settings/VoiceEchoPanel";
+import { FoodIllustration } from "./FoodIllustration";
 
 const CATEGORY_LABELS: Record<ItemCategory, string> = {
   food: "음식",
@@ -24,8 +27,9 @@ export function OverlayHost() {
   if (overlay === "none") return null;
   return (
     <div className="overlay-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOverlay("none"); }}>
-      <section className="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <section className={`sheet ${overlay === "fridge" ? "fridge-sheet" : ""}`} role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-testid={overlay === "fridge" ? "fridge-overlay" : undefined}>
         <button className="sheet-close" onClick={() => setOverlay("none")} aria-label="닫기">×</button>
+        {overlay === "fridge" && <FridgeOverlay />}
         {overlay === "shop" && <ShopOverlay />}
         {overlay === "inventory" && <InventoryOverlay />}
         {overlay === "wardrobe" && <WardrobeOverlay />}
@@ -37,6 +41,53 @@ export function OverlayHost() {
       </section>
     </div>
   );
+}
+
+function FridgeOverlay() {
+  const inventory = useGameStore((state) => state.inventory);
+  const level = useGameStore((state) => state.level);
+  const settings = useGameStore((state) => state.settings);
+  const care = useGameStore((state) => state.care);
+  const setOverlay = useGameStore((state) => state.setOverlay);
+  const foods = ITEM_CATALOG.filter((item) => item.category === "food");
+  const ownedCount = foods.reduce((total, item) => total + (inventory[item.id] ?? 0), 0);
+
+  const eat = (itemId: string) => {
+    care("feed", itemId);
+    gameBridge.emit("keeper:react", { action: "feed" });
+    playFeedbackTone(settings.sound, 540);
+    vibrateFeedback(settings.vibration);
+  };
+
+  return <>
+    <header className="fridge-header">
+      <span aria-hidden="true">KEEPER KITCHEN</span>
+      <h2 id="sheet-title">냉장고</h2>
+      <p><b>{ownedCount}</b>개의 신선한 식재료</p>
+    </header>
+    <div className="fridge-grid" aria-label="냉장고 음식">
+      {foods.map((item) => {
+        const quantity = inventory[item.id] ?? 0;
+        const locked = level < item.requiredLevel;
+        return <button
+          key={item.id}
+          className={quantity > 0 && !locked ? "available" : "empty"}
+          data-testid={`fridge-${item.id}`}
+          disabled={locked || quantity < 1}
+          onClick={() => eat(item.id)}
+          aria-label={locked ? `${item.name}, 레벨 ${item.requiredLevel}에 해금` : `${item.name}, ${quantity}개, 먹기`}
+        >
+          <span className="fridge-food-art"><FoodIllustration itemId={item.id} /></span>
+          <strong>{item.name}</strong>
+          <small>{locked ? `LV.${item.requiredLevel}` : `×${quantity}`}</small>
+        </button>;
+      })}
+      <button className="fridge-add" onClick={() => setOverlay("shop")} aria-label="식재료 상점 열기">
+        <span aria-hidden="true">＋</span><strong>식재료 추가</strong><small>상점</small>
+      </button>
+    </div>
+    <p className="fridge-help">음식을 누르면 Keeper에게 바로 먹일 수 있어요.</p>
+  </>;
 }
 
 function SheetHeader({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) {

@@ -6,6 +6,7 @@ import { createDefaultSave } from "../domain/defaults";
 import { progressDailyGoal, refreshDailyGoals, updateBalancedGoal, localDateKey } from "../domain/daily";
 import { calculateMiniGameReward, canPurchase, spendCoins } from "../domain/economy";
 import { levelFromXp, LEVEL_THRESHOLDS } from "../domain/progression";
+import { isOceanGame, oceanCompletionCopy, oceanGameNeedEffects } from "../domain/ocean";
 import type {
   CharacterProfile,
   GameNotification,
@@ -19,7 +20,7 @@ import type {
 import { clearGame, loadGame, saveGame } from "./persistence";
 import { parseImportedSave } from "./migrations";
 
-export type OverlayId = "none" | "inventory" | "shop" | "wardrobe" | "achievements" | "friends" | "settings" | "daily" | "notifications";
+export type OverlayId = "none" | "fridge" | "inventory" | "shop" | "wardrobe" | "achievements" | "friends" | "settings" | "daily" | "notifications";
 
 interface GameRuntime {
   hydrated: boolean;
@@ -230,6 +231,13 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     care(kind, itemId) {
+      const careToast = {
+        feed: "돌봄 · 식사를 반영했어요.",
+        wash: "돌봄 · 씻기를 반영했어요.",
+        sleep: "돌봄 · 휴식을 반영했어요.",
+        wellness: "돌봄 · 게임 속 전환을 반영했어요.",
+        play: "돌봄 · 운동을 반영했어요."
+      }[kind];
       commit((save) => {
         const now = new Date();
         const earnsXp = !save.lastCareAt || now.getTime() - new Date(save.lastCareAt).getTime() >= CARE_XP_COOLDOWN_MS;
@@ -283,7 +291,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           { title: "돌봄 완료", body: message, kind: "care" },
           now
         );
-      }, "돌봄이 반영됐어요.");
+      }, careToast);
     },
 
     purchase(itemId) {
@@ -337,12 +345,16 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     completeMiniGame(result) {
       const reward = calculateMiniGameReward(result);
+      const effects = isOceanGame(result.gameId)
+        ? oceanGameNeedEffects(result)
+        : { joy: result.success ? 12 : 6, energy: -4 };
+      const oceanCopy = oceanCompletionCopy(result);
       commit(
         (save) => ({
           ...save,
           coins: save.coins + reward.coins,
           xp: save.xp + reward.xp,
-          needs: applyNeedEffects(save.needs, { joy: result.success ? 12 : 6, energy: -4 }, new Date().toISOString()),
+          needs: applyNeedEffects(save.needs, effects, new Date().toISOString()),
           highScores: { ...save.highScores, [result.gameId]: Math.max(save.highScores[result.gameId] ?? 0, result.score) },
           dailyGoals: progressDailyGoal(save.dailyGoals, "play"),
           stats: {
@@ -352,7 +364,7 @@ export const useGameStore = create<GameStore>((set, get) => {
             totalMinigameScore: save.stats.totalMinigameScore + Math.max(0, result.score)
           }
         }),
-        `${reward.coins} 코인 · ${reward.xp} XP 획득`
+        oceanCopy ? `${oceanCopy} · ${reward.coins} 코인` : `${reward.coins} 코인 · ${reward.xp} XP 획득`
       );
       set({ activeMiniGame: null });
     },

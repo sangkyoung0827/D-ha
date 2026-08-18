@@ -13,6 +13,8 @@ import { MiniGameOverlay } from "../components/game-ui/MiniGameOverlay";
 import { DebugPanel } from "../components/game-ui/DebugPanel";
 import { loadMiniGameDefinition } from "../minigames/core/loadDefinition";
 import { GameRoom } from "../components/game-ui/GameRoom";
+import { OceanHub } from "../components/game-ui/OceanHub";
+import { OCEAN_ZONES, isOceanGame, oceanZoneForGame, type OceanMode, type OceanZoneId } from "../domain/ocean";
 
 export function App() {
   const hydrated = useGameStore((state) => state.hydrated);
@@ -27,6 +29,7 @@ export function App() {
   const settings = useGameStore((state) => state.settings);
   const activeMiniGame = useGameStore((state) => state.activeMiniGame);
   const toast = useGameStore((state) => state.toast);
+  const highScores = useGameStore((state) => state.highScores);
   const recoveryMessage = useGameStore((state) => state.recoveryMessage);
   const recoveryBackup = useGameStore((state) => state.recoveryBackup);
   const setRoom = useGameStore((state) => state.setRoom);
@@ -38,6 +41,8 @@ export function App() {
   const resetGame = useGameStore((state) => state.resetGame);
   const [bathProgress, setBathProgress] = useState(0);
   const [pendingResult, setPendingResult] = useState<MiniGameResult | null>(null);
+  const [oceanMode, setOceanMode] = useState<OceanMode>("exploration");
+  const [oceanZone, setOceanZone] = useState<OceanZoneId>("beach");
   const [updateReady, setUpdateReady] = useState(false);
   const updateServiceWorker = useRef<((reloadPage?: boolean) => Promise<void>) | null>(null);
   const debug = new URLSearchParams(window.location.search).get("debug") === "1";
@@ -52,6 +57,7 @@ export function App() {
     const timer = window.setTimeout(clearToast, 2400);
     return () => window.clearTimeout(timer);
   }, [toast, clearToast]);
+  useEffect(() => gameBridge.on("kitchen:fridge-open", () => setOverlay("fridge")), [setOverlay]);
 
   const handleBathComplete = useCallback(() => {
     care("wash");
@@ -72,10 +78,22 @@ export function App() {
     completeMiniGame(result);
     gameBridge.emit("keeper:react", { action: result.success ? "play" : "wellness" });
     setPendingResult(null);
-    setRoom("game-room");
+    if (isOceanGame(result.gameId)) {
+      const completedZone = oceanZoneForGame(result.gameId);
+      const index = OCEAN_ZONES.findIndex((zone) => zone.id === completedZone);
+      if (result.success && index >= 0 && index < OCEAN_ZONES.length - 1) setOceanZone(OCEAN_ZONES[index + 1]!.id);
+      setOceanMode("exploration");
+      setRoom("wellness");
+    } else {
+      setRoom("game-room");
+    }
   };
 
   const changeRoom = (room: RoomId) => {
+    if (activeMiniGame) {
+      setPendingResult(null);
+      setActiveMiniGame(null);
+    }
     setRoom(room);
     setBathProgress(0);
   };
@@ -87,11 +105,12 @@ export function App() {
     <div className={`app-background theme-${roomTheme} ${settings.reducedMotion ? "reduced-motion" : ""}`}>
       <div className="wide-ocean" aria-hidden="true"><i /><i /><i /></div>
       <main className="game-shell" data-testid="game-shell">
-        <StatusBar needs={needs} level={level} onDaily={() => setOverlay("daily")} onNotifications={() => setOverlay("notifications")} onSettings={() => setOverlay("settings")} />
-        <GameRoom room={currentRoom} keeperName={profile.name}>
-          <GameCanvas room={currentRoom} theme={roomTheme} equipped={equipped} skinTone={profile.skinTone} hairColor={profile.hairColor} reducedMotion={settings.reducedMotion} activeMiniGame={activeMiniGame} onMiniGameFinish={handleMiniGameFinish} onBathComplete={handleBathComplete} onBathProgress={handleBathProgress} />
-          {!activeMiniGame && <ContextTray room={currentRoom} bathProgress={bathProgress} onStartGame={(id) => void startGame(id)} />}
-          {activeMiniGame && <MiniGameOverlay id={activeMiniGame} result={pendingResult} debug={debug} onClaim={claimReward} onExit={() => { setPendingResult(null); setActiveMiniGame(null); setRoom("game-room"); }} />}
+        <StatusBar needs={needs} />
+        <GameRoom room={currentRoom} keeperName={profile.name} immersive={Boolean(activeMiniGame)}>
+          <GameCanvas room={currentRoom} theme={roomTheme} equipped={equipped} skinTone={profile.skinTone} hairStyle={profile.hairStyle} hairColor={profile.hairColor} reducedMotion={settings.reducedMotion} oceanMode={oceanMode} oceanZone={oceanZone} activeMiniGame={activeMiniGame} onMiniGameFinish={handleMiniGameFinish} onBathComplete={handleBathComplete} onBathProgress={handleBathProgress} />
+          {!activeMiniGame && currentRoom !== "studio" && currentRoom !== "wellness" && <ContextTray room={currentRoom} bathProgress={bathProgress} />}
+          {!activeMiniGame && currentRoom === "wellness" && <OceanHub mode={oceanMode} zone={oceanZone} highScores={highScores} onModeChange={setOceanMode} onZoneChange={setOceanZone} onStartGame={(id) => void startGame(id)} onOpenShop={() => setOverlay("shop")} />}
+          {activeMiniGame && <MiniGameOverlay id={activeMiniGame} result={pendingResult} debug={debug} onClaim={claimReward} onExit={() => { const returnRoom = isOceanGame(activeMiniGame) ? "wellness" : "game-room"; setPendingResult(null); setActiveMiniGame(null); setRoom(returnRoom); }} />}
         </GameRoom>
         <RoomNav current={currentRoom} onChange={changeRoom} />
       </main>
