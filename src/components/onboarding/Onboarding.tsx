@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { CharacterProfile } from "../../domain/types";
 import { useGameStore } from "../../store/gameStore";
+import { GameIcon } from "../icons/GameIcon";
 
 const SKINS: CharacterProfile["skinTone"][] = ["sunrise", "sand", "cocoa", "deep"];
 const HAIRS: CharacterProfile["hairStyle"][] = ["wave", "crop", "bun", "curl"];
@@ -46,15 +47,15 @@ export function Onboarding() {
 
   return (
     <main className="onboarding tour-screen">
-      <div className="tour-map" aria-hidden="true"><span>⌂</span><i /><span>◉</span><i /><span>✦</span></div>
+      <div className="tour-map" aria-hidden="true"><span><GameIcon name="home" /></span><i /><span><GameIcon name="ocean" /></span><i /><span><GameIcon name="sparkles" /></span></div>
       <p className="eyebrow">KEEPER ORIENTATION</p>
       <h1>돌보고, 놀고,<br />새 해역을 발견하세요.</h1>
       <ul className="tour-list">
         <li><b>01</b><span><strong>다섯 가지 상태</strong>시간이 지나면 변하지만 최대 24시간까지만 반영돼요.</span></li>
-        <li><b>02</b><span><strong>8개의 공간</strong>먹고, 씻고, 쉬고, 스타일을 바꿀 수 있어요.</span></li>
+        <li><b>02</b><span><strong>7개의 공간</strong>먹고, 씻고, 쉬고, 스타일을 바꿀 수 있어요.</span></li>
         <li><b>03</b><span><strong>세 가지 미니게임</strong>코인과 경험치를 얻어 새로운 기능을 열어요.</span></li>
       </ul>
-      <button className="primary-button wide" onClick={finishTutorial}>스튜디오 입장 · 보상 받기</button>
+      <button className="primary-button wide" onClick={finishTutorial}>Home 입장 · 보상 받기</button>
     </main>
   );
 }

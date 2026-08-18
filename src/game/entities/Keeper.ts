@@ -24,6 +24,9 @@ export class Keeper extends Phaser.GameObjects.Container {
   private reaction: Phaser.GameObjects.Text;
   private touchIndex = 0;
   private reducedMotion = false;
+  private pose: "standing" | "sleeping" = "standing";
+  private baseY: number;
+  private baseScale = 1;
   private style: { equipped: Record<WearableSlot, string | null>; skinTone: string; hairColor: string };
 
   constructor(
@@ -33,6 +36,7 @@ export class Keeper extends Phaser.GameObjects.Container {
     style: { equipped: Record<WearableSlot, string | null>; skinTone: string; hairColor: string }
   ) {
     super(scene, x, y);
+    this.baseY = y;
     this.style = style;
     this.graphics = scene.add.graphics();
     this.face = scene.add.graphics();
@@ -59,6 +63,15 @@ export class Keeper extends Phaser.GameObjects.Container {
     this.reducedMotion = value;
     if (value) this.scene.tweens.killTweensOf(this);
     else this.startIdle();
+  }
+
+  setRoomPresentation(x: number, y: number, scale: number, pose: "standing" | "sleeping"): void {
+    this.scene.tweens.killTweensOf(this);
+    this.pose = pose;
+    this.baseY = y;
+    this.baseScale = scale;
+    this.setPosition(x, y).setScale(scale).setAngle(this.baseAngle());
+    if (!this.reducedMotion) this.startIdle();
   }
 
   updateStyle(style: typeof this.style): void {
@@ -91,19 +104,20 @@ export class Keeper extends Phaser.GameObjects.Container {
       return;
     }
     const animation = action === "sleep" ? { angle: -7, y: 12 } : action === "wash" ? { angle: 4, y: -10 } : { angle: 0, y: -18 };
+    const baseAngle = this.baseAngle();
     this.scene.tweens.killTweensOf(this);
     this.scene.tweens.add({
       targets: this,
-      y: this.y + animation.y,
-      angle: animation.angle,
-      scaleX: action === "level" ? 1.08 : 1,
-      scaleY: action === "level" ? 1.08 : 1,
+      y: this.baseY + animation.y,
+      angle: baseAngle + animation.angle,
+      scaleX: action === "level" ? this.baseScale * 1.08 : this.baseScale,
+      scaleY: action === "level" ? this.baseScale * 1.08 : this.baseScale,
       duration: 260,
       yoyo: true,
       repeat: action === "wash" ? 2 : 0,
       ease: "Sine.easeOut",
       onComplete: () => {
-        this.setAngle(0).setScale(1);
+        this.setAngle(baseAngle).setScale(this.baseScale).setY(this.baseY);
         this.scene.tweens.add({ targets: this.reaction, alpha: 0, delay: 800, duration: 240 });
         this.startIdle();
       }
@@ -113,7 +127,8 @@ export class Keeper extends Phaser.GameObjects.Container {
   private startIdle(): void {
     if (this.reducedMotion || !this.scene.sys.isActive()) return;
     this.scene.tweens.killTweensOf(this);
-    this.scene.tweens.add({ targets: this, y: this.y - 5, duration: 1200, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    this.setY(this.baseY).setAngle(this.baseAngle()).setScale(this.baseScale);
+    this.scene.tweens.add({ targets: this, y: this.baseY - 5, duration: 1200, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
     this.scene.time.delayedCall(1600 + Math.random() * 1800, () => this.blink());
   }
 
@@ -137,15 +152,24 @@ export class Keeper extends Phaser.GameObjects.Container {
     const bottom = this.itemColor(this.style.equipped.bottom, 0x4d7180);
     const shoes = this.itemColor(this.style.equipped.shoes, 0xf4f0e6);
 
-    this.graphics.fillStyle(0x173847, 0.16).fillEllipse(0, 154, 124, 24);
-    this.graphics.fillStyle(shoes).fillRoundedRect(-58, 128, 50, 22, 10).fillRoundedRect(8, 128, 50, 22, 10);
-    this.graphics.fillStyle(bottom).fillRoundedRect(-50, 38, 42, 100, 18).fillRoundedRect(8, 38, 42, 100, 18);
-    this.graphics.fillStyle(top).fillRoundedRect(-68, -68, 136, 125, 34);
-    this.graphics.lineStyle(5, 0xffffff, 0.35).strokeRoundedRect(-68, -68, 136, 125, 34);
-    this.graphics.fillStyle(skin).fillRoundedRect(-91, -54, 27, 92, 13).fillRoundedRect(64, -54, 27, 92, 13);
-    this.graphics.fillStyle(skin).fillCircle(0, -122, 67);
-    this.graphics.fillStyle(hair).fillEllipse(0, -151, 132, 78);
-    this.graphics.fillTriangle(-64, -145, -38, -193, -12, -164);
+    this.graphics.fillStyle(0x173847, 0.15).fillEllipse(0, 154, 132, 25);
+    this.graphics.fillStyle(shoes).fillRoundedRect(-60, 126, 52, 24, 11).fillRoundedRect(8, 126, 52, 24, 11);
+    this.graphics.fillStyle(0xffffff, 0.3).fillRoundedRect(-53, 128, 39, 6, 3).fillRoundedRect(15, 128, 39, 6, 3);
+    this.graphics.fillStyle(bottom).fillRoundedRect(-51, 34, 43, 101, 18).fillRoundedRect(8, 34, 43, 101, 18);
+    this.graphics.fillStyle(0x173847, 0.1).fillRoundedRect(-18, 43, 10, 88, 5).fillRoundedRect(8, 43, 10, 88, 5);
+    this.graphics.fillStyle(skin).fillRoundedRect(-89, -52, 28, 86, 14).fillRoundedRect(61, -52, 28, 86, 14);
+    this.graphics.fillCircle(-75, 35, 15).fillCircle(75, 35, 15);
+    this.graphics.fillStyle(0x173847, 0.08).fillCircle(-75, 39, 11).fillCircle(75, 39, 11);
+    this.graphics.fillStyle(skin).fillRoundedRect(-15, -91, 30, 27, 10);
+    this.graphics.fillStyle(top).fillRoundedRect(-68, -70, 136, 126, 34);
+    this.graphics.fillStyle(0xffffff, 0.16).fillRoundedRect(-59, -63, 118, 42, 24);
+    this.graphics.lineStyle(4, 0xffffff, 0.27).strokeRoundedRect(-68, -70, 136, 126, 34);
+    this.graphics.fillStyle(skin).fillCircle(-61, -122, 14).fillCircle(61, -122, 14).fillCircle(0, -122, 67);
+    this.graphics.fillStyle(0xffffff, 0.08).fillEllipse(-19, -144, 56, 36);
+    this.graphics.fillStyle(hair).fillEllipse(0, -158, 137, 83);
+    this.graphics.fillRoundedRect(-67, -162, 24, 65, 12).fillRoundedRect(43, -162, 24, 65, 12);
+    this.graphics.fillTriangle(-65, -152, -34, -194, -8, -160).fillTriangle(-19, -171, 9, -199, 28, -158).fillTriangle(10, -173, 45, -190, 60, -146);
+    this.graphics.fillStyle(0xffffff, 0.09).fillEllipse(-22, -175, 65, 20);
     this.drawFace(false);
 
     if (this.style.equipped.accessory) {
@@ -156,13 +180,21 @@ export class Keeper extends Phaser.GameObjects.Container {
   }
 
   private drawFace(blinking: boolean): void {
-    this.face.lineStyle(5, 0x173847, 1);
+    this.face.lineStyle(4, 0x173847, 0.9);
+    this.face.lineBetween(-38, -140, -17, -144).lineBetween(17, -144, 38, -140);
     if (blinking) {
       this.face.lineBetween(-34, -124, -17, -124).lineBetween(17, -124, 34, -124);
     } else {
       this.face.fillStyle(0x173847).fillCircle(-25, -124, 6).fillCircle(25, -124, 6);
+      this.face.fillStyle(0xffffff, 0.85).fillCircle(-23, -126, 2).fillCircle(27, -126, 2);
     }
-    this.face.lineStyle(4, 0x994d45, 1).beginPath().arc(0, -100, 17, 0.2, Math.PI - 0.2).strokePath();
+    this.face.lineStyle(3, 0x9f6856, 0.72).beginPath().moveTo(0, -121).lineTo(-3, -108).lineTo(4, -107).strokePath();
+    this.face.fillStyle(0xef8f86, 0.22).fillEllipse(-44, -105, 22, 10).fillEllipse(44, -105, 22, 10);
+    this.face.lineStyle(4, 0x994d45, 1).beginPath().arc(0, -97, 16, 0.2, Math.PI - 0.2).strokePath();
+  }
+
+  private baseAngle(): number {
+    return this.pose === "sleeping" ? -78 : 0;
   }
 
   private itemColor(id: string | null, fallback: number): number {

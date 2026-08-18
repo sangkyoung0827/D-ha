@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { ACHIEVEMENTS } from "../../domain/achievements";
 import { ITEM_CATALOG } from "../../domain/catalog";
-import type { ItemCategory } from "../../domain/types";
+import type { ItemCategory, RoomId } from "../../domain/types";
 import { notificationProvider } from "../../platform/notification/NotificationProvider";
 import { socialProvider, type GameFriend } from "../../platform/social/SocialProvider";
-import { useGameStore, type OverlayId } from "../../store/gameStore";
+import { useGameStore } from "../../store/gameStore";
 import { VoiceEchoPanel } from "../settings/VoiceEchoPanel";
 
 const CATEGORY_LABELS: Record<ItemCategory, string> = {
@@ -44,13 +44,28 @@ function SheetHeader({ eyebrow, title, copy }: { eyebrow: string; title: string;
 }
 
 function ShopOverlay() {
-  const [category, setCategory] = useState<ItemCategory>("food");
+  const room = useGameStore((state) => state.currentRoom);
+  const categories = shopCategories(room);
+  const [category, setCategory] = useState<ItemCategory>(categories[0]!);
   const coins = useGameStore((state) => state.coins);
   const level = useGameStore((state) => state.level);
   const inventory = useGameStore((state) => state.inventory);
   const purchase = useGameStore((state) => state.purchase);
   const items = ITEM_CATALOG.filter((item) => item.category === category);
-  return <><SheetHeader eyebrow="COAST SUPPLY" title="Keeper 상점" copy="실제 결제 없이 게임 코인으로만 구매합니다." /><div className="shop-wallet"><span>보유 코인</span><strong>● {coins.toLocaleString()}</strong></div><div className="category-tabs">{(Object.keys(CATEGORY_LABELS) as ItemCategory[]).map((key) => <button key={key} className={category === key ? "active" : ""} onClick={() => setCategory(key)}>{CATEGORY_LABELS[key]}</button>)}</div><div className="catalog-grid">{items.map((item) => { const locked = level < item.requiredLevel; const poor = coins < item.price; return <article key={item.id} className={locked ? "locked" : ""}><i style={{ background: item.color }}>{item.symbol}</i><div><h3>{item.name}</h3><p>{item.description}</p><small>{inventory[item.id] ? `보유 ${inventory[item.id]}개` : `Level ${item.requiredLevel}`}</small></div><button data-testid={`buy-${item.id}`} disabled={locked || poor} onClick={() => purchase(item.id)}>{locked ? `LV.${item.requiredLevel}` : `● ${item.price}`}</button></article>; })}</div></>;
+  return <><SheetHeader eyebrow="ROOM SUPPLY" title={`${roomShopTitle(room)} 아이템`} copy="이 공간에서 사용하는 게임 아이템만 표시합니다." /><div className="shop-wallet"><span>보유 코인</span><strong>● {coins.toLocaleString()}</strong></div>{categories.length > 1 && <div className="category-tabs">{categories.map((key) => <button key={key} className={category === key ? "active" : ""} onClick={() => setCategory(key)}>{CATEGORY_LABELS[key]}</button>)}</div>}<div className="catalog-grid">{items.map((item) => { const locked = level < item.requiredLevel; const poor = coins < item.price; return <article key={item.id} className={locked ? "locked" : ""}><i style={{ background: item.color }}>{item.symbol}</i><div><h3>{item.name}</h3><p>{item.description}</p><small>{inventory[item.id] ? `보유 ${inventory[item.id]}개` : `Level ${item.requiredLevel}`}</small></div><button data-testid={`buy-${item.id}`} disabled={locked || poor} onClick={() => purchase(item.id)}>{locked ? `LV.${item.requiredLevel}` : `● ${item.price}`}</button></article>; })}</div></>;
+}
+
+function shopCategories(room: RoomId): ItemCategory[] {
+  if (room === "kitchen") return ["food"];
+  if (room === "wellness") return ["wellness"];
+  if (room === "wardrobe") return ["top", "bottom", "shoes", "accessory"];
+  if (room === "bedroom") return ["theme", "decoration"];
+  if (room === "game-room") return ["accessory"];
+  return ["decoration", "theme"];
+}
+
+function roomShopTitle(room: RoomId): string {
+  return { studio: "Home", kitchen: "Kitchen", wellness: "Ocean", bathroom: "Bath", bedroom: "Sleep", wardrobe: "Wardrobe", "game-room": "Workout", shop: "Room" }[room];
 }
 
 function InventoryOverlay() {
@@ -127,8 +142,4 @@ function SettingsOverlay() {
 
 function Toggle({ label, detail, checked, onChange }: { label: string; detail: string; checked: boolean; onChange(value: boolean): void }) {
   return <label className="toggle-row"><span><strong>{label}</strong><small>{detail}</small></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} /><i aria-hidden="true" /></label>;
-}
-
-export function AppMenu({ onOpen }: { onOpen(overlay: OverlayId): void }) {
-  return <nav className="app-menu" aria-label="게임 메뉴"><button onClick={() => onOpen("inventory")}><b>▣</b>보관함</button><button onClick={() => onOpen("achievements")}><b>✦</b>업적</button><button onClick={() => onOpen("friends")}><b>◎</b>친구</button><button onClick={() => onOpen("settings")}><b>⚙</b>설정</button></nav>;
 }

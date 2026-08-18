@@ -222,7 +222,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     },
 
     setRoom(currentRoom) {
-      set({ currentRoom, overlay: currentRoom === "shop" ? "shop" : currentRoom === "wardrobe" ? "wardrobe" : "none" });
+      set({ currentRoom, overlay: currentRoom === "shop" ? "shop" : "none" });
     },
 
     setOverlay(overlay) {
