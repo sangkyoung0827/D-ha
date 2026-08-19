@@ -38,6 +38,7 @@ export function GameCanvas(props: GameCanvasProps) {
   useEffect(() => {
     if (!hostRef.current || gameRef.current) return;
     const renderScale = getRenderScale();
+    const initialPresentation = presentationRef.current;
     const game = new Phaser.Game({
       type: Phaser.AUTO,
       width: GAME_WIDTH * renderScale,
@@ -47,10 +48,14 @@ export function GameCanvas(props: GameCanvasProps) {
       scene: [BootScene, RoomScene],
       render: { antialias: true, antialiasGL: true, pixelArt: false, roundPixels: false, powerPreference: "high-performance" },
       scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: GAME_WIDTH * renderScale, height: GAME_HEIGHT * renderScale, autoRound: false },
-      input: { activePointers: 2 }
+      input: { activePointers: 2 },
+      callbacks: {
+        preBoot(bootingGame) {
+          bootingGame.registry.set("render-scale", renderScale);
+          bootingGame.registry.set("initial-presentation", initialPresentation);
+        }
+      }
     });
-    game.registry.set("render-scale", renderScale);
-    game.registry.set("initial-presentation", presentationRef.current);
     gameRef.current = game;
     return () => {
       gameRef.current?.destroy(true);
