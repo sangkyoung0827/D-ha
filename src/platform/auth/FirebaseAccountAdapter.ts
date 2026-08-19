@@ -1,10 +1,11 @@
 import {
   browserLocalPersistence,
   getAuth,
+  getRedirectResult,
   GoogleAuthProvider,
   onAuthStateChanged,
   setPersistence,
-  signInWithPopup,
+  signInWithRedirect,
   signOut as firebaseSignOut,
   type User
 } from "firebase/auth";
@@ -22,7 +23,9 @@ function toGameAccount(user: User): GameAccount {
 
 export class FirebaseAccountAdapter implements AccountAdapter {
   private auth = getAuth(getFirebaseClient());
-  private persistenceReady = setPersistence(this.auth, browserLocalPersistence);
+  private authReady = setPersistence(this.auth, browserLocalPersistence)
+    .then(() => getRedirectResult(this.auth))
+    .then(() => undefined);
 
   constructor() {
     this.auth.useDeviceLanguage();
@@ -39,18 +42,18 @@ export class FirebaseAccountAdapter implements AccountAdapter {
           : { status: "signed-out", account: null });
       });
     };
-    void this.persistenceReady.then(beginObserving, beginObserving);
+    void this.authReady.then(beginObserving, beginObserving);
     return () => {
       active = false;
       unsubscribe();
     };
   }
 
-  async signInWithGoogle(): Promise<GameAccount> {
+  async signInWithGoogle(): Promise<null> {
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
-    const result = await signInWithPopup(this.auth, provider);
-    return toGameAccount(result.user);
+    await signInWithRedirect(this.auth, provider);
+    return null;
   }
 
   async signOut(): Promise<void> {
