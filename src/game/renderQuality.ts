@@ -4,8 +4,7 @@ export const GAME_WIDTH = 390;
 export const GAME_HEIGHT = 700;
 
 export function getRenderScale(): number {
-  if (typeof window === "undefined") return 1;
-  return Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+  return 2;
 }
 
 export function applyHighDpiCamera(scene: Phaser.Scene): number {

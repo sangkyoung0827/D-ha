@@ -275,11 +275,6 @@ export class RoomScene extends Phaser.Scene {
       return;
     }
 
-    if (this.room === "wellness") {
-      this.createDoor({ id: "ocean-home", label: "집으로", destination: "studio", x: 42, y: 278, width: 64, height: 166, approachX: 88, approachY: 410, color: 0xf1d89a, opensTo: -1 });
-      return;
-    }
-
     if (this.room === "game-room") {
       this.createDoor({ id: "workout-home", label: "정원문 · Home", destination: "studio", x: 344, y: 270, width: 72, height: 184, approachX: 302, approachY: 418, color: 0x4d9273, opensTo: 1 });
     }

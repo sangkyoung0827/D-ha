@@ -64,6 +64,25 @@ export class MiniGameScene extends Phaser.Scene {
   private oceanAmbient: Phaser.GameObjects.Container[] = [];
   private oceanBackground?: Phaser.GameObjects.Image;
   private oceanChapterText?: Phaser.GameObjects.Text;
+  private oceanDha = 100;
+  private oceanNextDhaAt = 0;
+  private oceanDhaDepleted = false;
+  private oceanDhaFill?: Phaser.GameObjects.Rectangle;
+  private oceanDhaText?: Phaser.GameObjects.Text;
+  private oceanVisionFog?: Phaser.GameObjects.Rectangle;
+  private jumpPlatforms: Phaser.GameObjects.Container[] = [];
+  private jumpVelocityY = -420;
+  private jumpAltitude = 0;
+  private jumpPhaseIndex = 0;
+  private jumpPlatformSerial = 0;
+  private jumpNextDhaPlatform = 4;
+  private jumpTopLane = 1;
+  private jumpBoostAvailable = true;
+  private jumpLastHudAt = 0;
+  private jumpBackground?: Phaser.GameObjects.Rectangle;
+  private jumpPhaseText?: Phaser.GameObjects.Text;
+  private jumpStars: Phaser.GameObjects.Arc[] = [];
+  private jumpScenery: Phaser.GameObjects.GameObject[] = [];
   private readonly oceanRunnerY = 430;
   private readonly oceanHorizonY = 228;
 
@@ -110,12 +129,31 @@ export class MiniGameScene extends Phaser.Scene {
     this.oceanAmbient = [];
     this.oceanBackground = undefined;
     this.oceanChapterText = undefined;
+    this.oceanDha = 100;
+    this.oceanNextDhaAt = 0;
+    this.oceanDhaDepleted = false;
+    this.oceanDhaFill = undefined;
+    this.oceanDhaText = undefined;
+    this.oceanVisionFog = undefined;
+    this.jumpPlatforms = [];
+    this.jumpVelocityY = -420;
+    this.jumpAltitude = 0;
+    this.jumpPhaseIndex = 0;
+    this.jumpPlatformSerial = 0;
+    this.jumpNextDhaPlatform = 4;
+    this.jumpTopLane = 1;
+    this.jumpBoostAvailable = true;
+    this.jumpLastHudAt = 0;
+    this.jumpBackground = undefined;
+    this.jumpPhaseText = undefined;
+    this.jumpStars = [];
+    this.jumpScenery = [];
   }
 
   create(): void {
     const renderScale = applyHighDpiCamera(this);
     this.startedAt = this.time.now;
-    const darkGame = this.gameId === "current-run" || this.gameId === "ocean-run" || this.gameId === "reef-surf" || this.gameId === "cave-sonar" || this.gameId === "deepsea-descent";
+    const darkGame = this.gameId === "current-run" || this.gameId === "ocean-run" || this.gameId === "jump-up" || this.gameId === "reef-surf" || this.gameId === "cave-sonar" || this.gameId === "deepsea-descent";
     this.cameras.main.setBackgroundColor(darkGame ? "#102d4d" : "#dff5ec");
     this.add
       .text(20, 18, this.title(), { fontFamily: "system-ui", fontSize: "17px", fontStyle: "bold", color: darkGame ? "#e6fff8" : "#174b57", resolution: renderScale })
@@ -136,6 +174,7 @@ export class MiniGameScene extends Phaser.Scene {
     if (this.gameId === "current-run") this.createCurrentRun();
     if (this.gameId === "reef-memory") this.createReefMemory();
     if (this.gameId === "ocean-run") this.createOceanRun();
+    if (this.gameId === "jump-up") this.createJumpUp();
     if (this.gameId === "beach-volleyball" || this.gameId === "beach-pingpong" || this.gameId === "beach-football") this.createBeachSport();
     if (this.gameId === "open-water-catch") this.createOpenWaterCatch();
     if (this.gameId === "reef-surf" || this.gameId === "deepsea-descent") this.createCurrentRun();
@@ -148,6 +187,20 @@ export class MiniGameScene extends Phaser.Scene {
       gameBridge.on("minigame:restart", () => this.scene.restart({ id: this.gameId, oceanGear: this.oceanGear })),
       gameBridge.on("minigame:move", ({ direction }) => this.moveLane(direction)),
       gameBridge.on("minigame:action", () => this.performPrimaryAction()),
+      gameBridge.on("minigame:debug-dha", ({ value }) => {
+        if ((this.gameId !== "ocean-run" && this.gameId !== "jump-up") || this.finished) return;
+        this.oceanDha = Phaser.Math.Clamp(value, 0, 100);
+        this.updateOceanDhaEffects(this.time.now);
+        if (this.gameId === "jump-up") this.updateJumpUpHud();
+        else this.updateOceanHud();
+        if (this.oceanDha <= 0) this.endOceanRunForDha();
+      }),
+      gameBridge.on("minigame:debug-jump-space", () => {
+        if (this.gameId !== "jump-up" || this.finished) return;
+        this.jumpAltitude = Math.max(this.jumpAltitude, 65_000);
+        this.updateJumpUpPhase();
+        this.updateJumpUpHud();
+      }),
       gameBridge.on("minigame:demo-finish", () => {
         this.score = Math.max(this.score, 640);
         this.finish(true);
@@ -162,6 +215,7 @@ export class MiniGameScene extends Phaser.Scene {
     this.timerText?.setText(String(remaining));
     if (this.gameId === "current-run" || this.gameId === "reef-surf" || this.gameId === "deepsea-descent") this.updateCurrentRun(delta, time);
     if (this.gameId === "ocean-run") this.updateOceanRun(delta, time);
+    if (this.gameId === "jump-up") this.updateJumpUp(delta, time);
     if (this.gameId === "beach-volleyball" || this.gameId === "beach-pingpong") this.updateRallySport(delta);
     if (this.gameId === "beach-football") this.updateFootball(time);
     if (this.gameId === "open-water-catch") this.updateOpenWater(delta);
@@ -378,6 +432,7 @@ export class MiniGameScene extends Phaser.Scene {
 
   private performPrimaryAction(): void {
     if (this.gameId === "ocean-run") this.jumpOceanRunner();
+    if (this.gameId === "jump-up") this.boostJumpUp();
     if (this.gameId === "beach-pingpong" || this.gameId === "beach-volleyball") this.attemptRallyHit();
     if (this.gameId === "beach-football") this.attemptFootballShot();
   }
@@ -569,12 +624,214 @@ export class MiniGameScene extends Phaser.Scene {
     this.spawnEvent = this.time.addEvent({ delay: 520, callback: spawn, loop: true });
   }
 
+  private createJumpUp(): void {
+    this.durationMs = 50_000;
+    this.oceanDha = 100;
+    this.scoreText?.setPosition(16, 146).setFontSize(12).setBackgroundColor("#111638bd").setPadding(9, 6);
+    this.timerText?.setPosition(374, 146).setFontSize(14).setBackgroundColor("#111638bd").setPadding(9, 6);
+    this.jumpBackground = this.add.rectangle(195, 350, 390, 700, 0x66cfd4).setDepth(0);
+    this.add.circle(64, 108, 42, 0xffdf7d, 0.92).setDepth(1);
+    this.add.ellipse(195, 684, 520, 142, 0xf4d68e).setDepth(1);
+    this.add.ellipse(195, 650, 470, 74, 0x4cbaa9, 0.38).setDepth(1);
+    for (let index = 0; index < 34; index += 1) {
+      const star = this.add.circle((index * 73 + 19) % 390, 78 + ((index * 109) % 520), 1 + index % 3, index % 4 ? 0xe7f8ff : 0xffe59b, 0).setDepth(1);
+      this.jumpStars.push(star);
+    }
+    for (let index = 0; index < 7; index += 1) {
+      const cloud = this.add.ellipse(45 + (index * 91) % 330, 170 + index * 72, 82 + index % 3 * 18, 24, 0xffffff, 0.42).setDepth(2);
+      this.jumpScenery.push(cloud);
+      if (!this.registry.get("reduced-motion")) this.tweens.add({ targets: cloud, x: cloud.x + (index % 2 ? 22 : -22), duration: 2600 + index * 230, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    }
+    this.jumpPhaseText = this.add.text(195, 104, "01  해변 위", {
+      fontFamily: "system-ui",
+      fontSize: "13px",
+      fontStyle: "bold",
+      color: "#ffffff",
+      backgroundColor: "#151b47b8",
+      padding: { x: 12, y: 7 },
+      resolution: Number(this.registry.get("render-scale")) || 1
+    }).setOrigin(0.5).setDepth(20);
+
+    const initialPlatforms: Array<[number, number]> = [[620, 1], [522, 1], [430, 0], [338, 1], [246, 2], [154, 1], [68, 0]];
+    for (const [y, lane] of initialPlatforms) this.createJumpPlatform(y, lane, y === 620);
+    this.runner = this.createSportPet(this.lanes[1] ?? 195, 588, 0.72, this.playerPetProfile(), false).setDepth(14);
+    this.jumpVelocityY = -430;
+    this.createOceanDhaHud();
+
+    this.input.keyboard?.on("keydown-LEFT", () => this.moveLane(-1));
+    this.input.keyboard?.on("keydown-RIGHT", () => this.moveLane(1));
+    this.input.keyboard?.on("keydown-UP", () => this.boostJumpUp());
+    this.input.keyboard?.on("keydown-SPACE", () => this.boostJumpUp());
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      this.pointerStart = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
+    });
+    this.input.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+      if (!this.pointerStart) return;
+      const dx = pointer.worldX - this.pointerStart.x;
+      const dy = pointer.worldY - this.pointerStart.y;
+      if (Math.abs(dx) > 32 && Math.abs(dx) > Math.abs(dy)) this.moveLane(dx > 0 ? 1 : -1);
+      else this.boostJumpUp();
+      this.pointerStart = undefined;
+    });
+    this.updateJumpUpHud();
+  }
+
+  private createJumpPlatform(y: number, lane: number, safe = false): void {
+    this.jumpPlatformSerial += 1;
+    const hasDha = !safe && this.jumpPlatformSerial === this.jumpNextDhaPlatform;
+    if (hasDha) this.jumpNextDhaPlatform += Phaser.Math.Between(4, 6);
+    const phaseColor = [0xf3cf63, 0x7addcf, 0x99a8ef, 0x746fe1][this.jumpPhaseIndex] ?? 0xf3cf63;
+    const platform = this.add.container(this.lanes[lane] ?? 195, y).setDepth(8);
+    const shadow = this.add.ellipse(0, 7, 104, 18, 0x10173f, 0.2);
+    const slab = this.add.rectangle(0, 0, 96, 18, phaseColor).setStrokeStyle(3, 0xffffff, 0.82);
+    const shine = this.add.rectangle(-13, -4, 54, 4, 0xffffff, 0.3);
+    platform.add([shadow, slab, shine]);
+    if (hasDha) {
+      const glow = this.add.circle(0, -30, 27, 0x8ff5e8, 0.24).setBlendMode(Phaser.BlendModes.ADD);
+      const capsule = this.add.graphics().setPosition(0, -30);
+      capsule.fillStyle(0xffca68, 1).fillRoundedRect(-20, -10, 20, 20, 10);
+      capsule.fillStyle(0x53d7cb, 1).fillRoundedRect(0, -10, 20, 20, 10);
+      capsule.lineStyle(3, 0xffffff, 0.96).strokeRoundedRect(-20, -10, 40, 20, 10);
+      capsule.lineStyle(1.5, 0xffffff, 0.85).lineBetween(0, -9, 0, 9);
+      const label = this.add.text(0, -30, "DHA", { fontFamily: "system-ui", fontSize: "7px", fontStyle: "bold", color: "#153b48", resolution: Number(this.registry.get("render-scale")) || 1 }).setOrigin(0.5);
+      platform.add([glow, capsule, label]);
+      platform.setData("pill-parts", [glow, capsule, label]);
+    }
+    platform.setData("lane", lane).setData("dha", hasDha).setData("collected", false);
+    this.jumpPlatforms.push(platform);
+    this.jumpTopLane = lane;
+  }
+
+  private updateJumpUp(delta: number, time: number): void {
+    if (!this.runner) return;
+    this.oceanDha = Math.max(0, this.oceanDha - delta * 0.0021);
+    this.updateOceanDhaEffects(time);
+    if (this.oceanDha <= 0) {
+      this.endOceanRunForDha();
+      return;
+    }
+
+    const seconds = delta / 1000;
+    const footOffset = 25;
+    const previousFoot = this.runner.y + footOffset;
+    this.jumpVelocityY += 780 * seconds;
+    this.runner.y += this.jumpVelocityY * seconds;
+    const currentFoot = this.runner.y + footOffset;
+
+    if (this.jumpVelocityY >= 0) {
+      const landing = this.jumpPlatforms
+        .filter((platform) => previousFoot <= platform.y + 2 && currentFoot >= platform.y - 3 && Math.abs(this.runner!.x - platform.x) < 55)
+        .sort((a, b) => a.y - b.y)[0];
+      if (landing) {
+        this.runner.y = landing.y - footOffset;
+        this.jumpVelocityY = -430;
+        this.jumpBoostAvailable = true;
+        this.score += 55 + this.jumpPhaseIndex * 15;
+        this.tweens.add({ targets: landing, scaleX: 0.9, scaleY: 0.76, duration: 80, yoyo: true, ease: "Sine.easeOut" });
+        if (landing.getData("dha") && !landing.getData("collected")) this.collectJumpUpDha(landing);
+      }
+    }
+
+    if (this.runner.y < 300) {
+      const shift = 300 - this.runner.y;
+      this.runner.y = 300;
+      this.jumpPlatforms.forEach((platform) => { platform.y += shift; });
+      this.jumpScenery.forEach((object) => {
+        if ("y" in object && typeof object.y === "number") object.y += shift * 0.35;
+      });
+      this.jumpAltitude += shift * 45;
+      this.score += shift * 0.65;
+      this.ensureJumpPlatforms();
+      this.updateJumpUpPhase();
+    }
+
+    for (const platform of [...this.jumpPlatforms]) {
+      if (platform.y > 735) {
+        platform.destroy();
+        this.jumpPlatforms = this.jumpPlatforms.filter((item) => item !== platform);
+      }
+    }
+
+    if (this.runner.y > 735) {
+      this.infoText?.setText("발판을 놓쳤어요 · 다음 도전에서는 좌우 이동을 더 빠르게!");
+      this.finish(false);
+      return;
+    }
+    if (time - this.jumpLastHudAt > 160) {
+      this.jumpLastHudAt = time;
+      this.updateJumpUpHud();
+    }
+  }
+
+  private ensureJumpPlatforms(): void {
+    let top = this.jumpPlatforms.reduce((value, platform) => Math.min(value, platform.y), 700);
+    while (top > 70) {
+      top -= Phaser.Math.Between(78, 96);
+      let lane = Phaser.Math.Clamp(this.jumpTopLane + Phaser.Math.Between(-1, 1), 0, 2);
+      if (lane === this.jumpTopLane && Math.random() > 0.45) lane = Phaser.Math.Clamp(lane + (lane === 2 ? -1 : 1), 0, 2);
+      this.createJumpPlatform(top, lane);
+    }
+  }
+
+  private collectJumpUpDha(platform: Phaser.GameObjects.Container): void {
+    platform.setData("collected", true);
+    this.oceanDha = Math.min(100, this.oceanDha + 30);
+    this.score += 180;
+    this.combo += 1;
+    const pillParts = platform.getData("pill-parts") as Phaser.GameObjects.GameObject[] | undefined;
+    pillParts?.forEach((part) => this.tweens.add({ targets: part, y: "-=18", alpha: 0, scale: 1.4, duration: 180, onComplete: () => part.destroy() }));
+    this.cameras.main.flash(110, 143, 245, 232, false);
+    this.infoText?.setText(`DHA 알약 획득 · 게이지 +30 · ${this.combo} 콤보`);
+    this.updateOceanDhaEffects(this.time.now);
+    this.updateJumpUpHud();
+  }
+
+  private updateJumpUpPhase(): void {
+    const nextPhase = this.jumpAltitude >= 60_000 ? 3 : this.jumpAltitude >= 18_000 ? 2 : this.jumpAltitude >= 3_000 ? 1 : 0;
+    if (nextPhase === this.jumpPhaseIndex) return;
+    this.jumpPhaseIndex = nextPhase;
+    const phaseNames = ["01  해변 위", "02  구름 바다", "03  대기권", "04  우주"];
+    const colors = [0x66cfd4, 0x5c9ed0, 0x39477f, 0x090d2d];
+    this.jumpBackground?.setFillStyle(colors[nextPhase] ?? 0x090d2d);
+    this.jumpPhaseText?.setText(phaseNames[nextPhase] ?? "04  우주").setScale(0.92).setAlpha(0.3);
+    this.tweens.add({ targets: this.jumpPhaseText, scale: 1, alpha: 1, duration: 240, ease: "Back.easeOut" });
+    this.jumpStars.forEach((star, index) => star.setAlpha(nextPhase < 2 ? 0 : nextPhase === 2 ? 0.22 + index % 4 * 0.08 : 0.5 + index % 4 * 0.12));
+    this.jumpPlatforms.forEach((platform) => {
+      const slab = platform.list[1] as Phaser.GameObjects.Rectangle | undefined;
+      slab?.setFillStyle([0xf3cf63, 0x7addcf, 0x99a8ef, 0x746fe1][nextPhase] ?? 0x746fe1);
+    });
+    this.cameras.main.flash(180, 218, 245, 255, false);
+  }
+
+  private updateJumpUpHud(): void {
+    const phases = ["해변 위", "구름 바다", "대기권", "우주"];
+    const altitude = Math.floor(this.jumpAltitude);
+    this.scoreText?.setText(`${phases[this.jumpPhaseIndex]} · ${altitude.toLocaleString()} m · ${Math.floor(this.score)}점`);
+    if (!this.finished) this.infoText?.setText(`DHA ${Math.ceil(this.oceanDha)}% · ← → 다음 발판으로 이동 · 자동 점프`);
+    gameBridge.emit("minigame:progress", {
+      gameId: this.gameId,
+      score: Math.floor(this.score),
+      playerPoints: this.jumpPhaseIndex + 1,
+      computerPoints: altitude,
+      dha: Math.ceil(this.oceanDha)
+    });
+  }
+
+  private boostJumpUp(): void {
+    if (this.gameId !== "jump-up" || !this.runner || this.finished || !this.jumpBoostAvailable) return;
+    this.jumpBoostAvailable = false;
+    this.jumpVelocityY = Math.min(this.jumpVelocityY, -445);
+    this.tweens.add({ targets: this.runner, scaleX: 0.76, scaleY: 0.68, duration: 85, yoyo: true, ease: "Sine.easeOut" });
+  }
+
   private createOceanRun(): void {
     this.durationMs = 48_000;
     this.health = 3;
     this.scoreText?.setPosition(16, 146).setFontSize(12).setBackgroundColor("#061d2ab8").setPadding(9, 6);
     this.timerText?.setPosition(374, 146).setFontSize(14).setBackgroundColor("#061d2ab8").setPadding(9, 6);
     this.enterOceanChapter("beach", true);
+    this.oceanNextDhaAt = this.time.now + Phaser.Math.Between(3_800, 4_800);
+    this.createOceanDhaHud();
     this.input.keyboard?.on("keydown-LEFT", () => this.moveLane(-1));
     this.input.keyboard?.on("keydown-RIGHT", () => this.moveLane(1));
     this.input.keyboard?.on("keydown-UP", () => this.jumpOceanRunner());
@@ -595,6 +852,14 @@ export class MiniGameScene extends Phaser.Scene {
   }
 
   private updateOceanRun(delta: number, time: number): void {
+    if (!this.oceanTransitioning) {
+      this.oceanDha = Math.max(0, this.oceanDha - delta * 0.00235);
+      this.updateOceanDhaEffects(time);
+      if (this.oceanDha <= 0) {
+        this.endOceanRunForDha();
+        return;
+      }
+    }
     const elapsed = time - this.startedAt;
     const nextChapterIndex = Math.min(3, Math.floor(elapsed / 12_000));
     if (nextChapterIndex > this.oceanChapterIndex && !this.oceanTransitioning) {
@@ -649,10 +914,12 @@ export class MiniGameScene extends Phaser.Scene {
       const reachesRunner = progress > 0.82 && progress < 0.97 && targetLane === this.laneIndex;
       if (this.runner && reachesRunner && (object.getData("collectible") || !this.oceanJumping)) {
         if (object.getData("collectible")) {
-          this.score += 120;
+          this.oceanDha = Math.min(100, this.oceanDha + 30);
+          this.score += 160;
           this.combo += 1;
-          this.infoText?.setText(`진주 콤보 ${this.combo} · +120`);
-          this.cameras.main.flash(80, 255, 224, 135, false);
+          this.infoText?.setText(`DHA 알약 섭취 · 게이지 +30 · ${this.combo} 콤보`);
+          this.cameras.main.flash(110, 143, 245, 232, false);
+          this.updateOceanDhaEffects(time);
         } else if (time >= this.oceanInvulnerableUntil) {
           this.health -= 1;
           this.combo = 0;
@@ -681,6 +948,56 @@ export class MiniGameScene extends Phaser.Scene {
       this.oceanLastProgressAt = time;
       this.updateOceanHud();
     }
+  }
+
+  private createOceanDhaHud(): void {
+    const renderScale = Number(this.registry.get("render-scale")) || 1;
+    this.add.rectangle(357, 290, 42, 156, 0x061d2a, 0.82).setStrokeStyle(2, 0xbffff5, 0.42).setDepth(25);
+    this.add.text(357, 222, "DHA", {
+      fontFamily: "system-ui",
+      fontSize: "10px",
+      fontStyle: "bold",
+      color: "#dffff8",
+      resolution: renderScale
+    }).setOrigin(0.5).setDepth(26);
+    this.add.rectangle(357, 297, 14, 112, 0x173c49, 0.92).setStrokeStyle(2, 0xffffff, 0.5).setDepth(25);
+    this.oceanDhaFill = this.add.rectangle(357, 351, 10, 108, 0x5ae0d1, 1).setOrigin(0.5, 1).setDepth(26);
+    this.oceanDhaText = this.add.text(357, 363, "100%", {
+      fontFamily: "system-ui",
+      fontSize: "9px",
+      fontStyle: "bold",
+      color: "#ffffff",
+      resolution: renderScale
+    }).setOrigin(0.5).setDepth(26);
+    const pill = this.add.graphics().setPosition(357, 242).setDepth(26);
+    pill.fillStyle(0xffffff, 0.16).fillCircle(0, 0, 15);
+    pill.fillStyle(0xffca68, 1).fillRoundedRect(-12, -6, 12, 12, 6);
+    pill.fillStyle(0x53d7cb, 1).fillRoundedRect(0, -6, 12, 12, 6);
+    pill.lineStyle(2, 0xffffff, 0.95).strokeRoundedRect(-12, -6, 24, 12, 6);
+    pill.lineStyle(1, 0xffffff, 0.8).lineBetween(0, -5, 0, 5);
+    this.oceanVisionFog = this.add.rectangle(195, 350, 390, 700, 0xffffff, 0).setDepth(17);
+    this.updateOceanDhaEffects(this.time.now);
+  }
+
+  private updateOceanDhaEffects(time: number): void {
+    const ratio = Phaser.Math.Clamp(this.oceanDha / 100, 0, 1);
+    const color = this.oceanDha < 20 ? 0xef786d : this.oceanDha < 45 ? 0xf0bd58 : 0x5ae0d1;
+    this.oceanDhaFill?.setScale(1, ratio).setFillStyle(color, 1);
+    this.oceanDhaText?.setText(`${Math.ceil(this.oceanDha)}%`).setColor(this.oceanDha < 20 ? "#ffd4ce" : "#ffffff");
+    const shortage = Phaser.Math.Clamp((20 - this.oceanDha) / 20, 0, 1);
+    const pulse = shortage > 0 ? (Math.sin(time / 185) + 1) * 0.035 : 0;
+    this.oceanVisionFog?.setAlpha(Phaser.Math.Clamp(shortage * 0.88 + pulse, 0, 0.94));
+  }
+
+  private endOceanRunForDha(): void {
+    if (this.finished) return;
+    this.oceanDha = 0;
+    this.oceanDhaDepleted = true;
+    this.updateOceanDhaEffects(this.time.now);
+    this.infoText?.setText(this.gameId === "jump-up" ? "DHA 게이지 소진 · 점프가 종료됐어요." : "DHA 게이지 소진 · 달리기가 종료됐어요.");
+    if (this.gameId === "jump-up") this.updateJumpUpHud();
+    else this.updateOceanHud();
+    this.finish(false);
   }
 
   private enterOceanChapter(chapter: OceanRunChapterId, immediate: boolean): void {
@@ -906,25 +1223,25 @@ export class MiniGameScene extends Phaser.Scene {
     if (this.finished || this.oceanTransitioning) return;
     const chapter = OCEAN_RUN_CHAPTERS[this.oceanChapterIndex]?.id ?? "beach";
     const lane = Phaser.Math.Between(0, 2);
-    const collectible = Math.random() < 0.27;
+    const collectible = this.time.now >= this.oceanNextDhaAt;
+    if (collectible) this.oceanNextDhaAt = this.time.now + Phaser.Math.Between(4_400, 6_000);
     let parts: Phaser.GameObjects.GameObject[];
     let label = "장애물";
     if (collectible) {
+      const capsule = this.add.graphics();
+      capsule.fillStyle(0xffca68, 1).fillRoundedRect(-28, -14, 28, 28, 14);
+      capsule.fillStyle(0x53d7cb, 1).fillRoundedRect(0, -14, 28, 28, 14);
+      capsule.lineStyle(4, 0xffffff, 0.96).strokeRoundedRect(-28, -14, 56, 28, 14);
+      capsule.lineStyle(2, 0xffffff, 0.82).lineBetween(0, -12, 0, 12);
       parts = [
-        this.add.circle(0, 4, 23, 0x8ff5e8, 0.18).setBlendMode(Phaser.BlendModes.ADD),
-        this.add.circle(0, 0, 15, 0xffe49a).setStrokeStyle(3, 0xffffff, 0.92),
-        this.add.circle(-5, -5, 5, 0xffffff, 0.78),
-        this.add.arc(0, 0, 19, 210, 345, false, 0x000000, 0).setStrokeStyle(2, 0xe6aa55, 0.55)
+        this.add.circle(0, 2, 43, 0x8ff5e8, 0.25).setBlendMode(Phaser.BlendModes.ADD),
+        capsule,
+        this.add.text(0, 1, "DHA", { fontFamily: "system-ui", fontSize: "10px", fontStyle: "bold", color: "#123a46", resolution: Number(this.registry.get("render-scale")) || 1 }).setOrigin(0.5)
       ];
-      label = "진주";
+      label = "DHA 알약";
     } else if (chapter === "beach") {
-      if (Math.random() < 0.5) {
-        parts = [this.add.ellipse(0, 26, 150, 26, 0x281710, 0.28), this.add.image(0, -15, "ocean-run-palm").setDisplaySize(176, 99)];
-        label = "쓰러진 야자수";
-      } else {
-        parts = [this.add.ellipse(0, 27, 138, 24, 0x281710, 0.28), this.add.image(0, -7, "ocean-run-driftwood").setDisplaySize(155, 103)];
-        label = "산호 유목";
-      }
+      parts = [this.add.ellipse(0, 26, 150, 26, 0x281710, 0.28), this.add.image(0, -15, "ocean-run-palm").setDisplaySize(176, 99)];
+      label = "야자수";
     } else if (chapter === "surf") {
       if (Math.random() < 0.5) {
         parts = [
@@ -937,13 +1254,12 @@ export class MiniGameScene extends Phaser.Scene {
         label = "상어";
       } else {
         parts = [
-          this.add.ellipse(0, 16, 128, 25, 0x0b6381, 0.4),
-          this.add.arc(0, 11, 68, 184, 356, false, 0x52caca, 0.68).setStrokeStyle(15, 0x5edbd7, 0.8),
-          this.add.arc(0, 4, 62, 188, 352, false, 0xffffff, 0).setStrokeStyle(8, 0xffffff, 0.9),
-          this.add.ellipse(-28, -7, 25, 11, 0xffffff, 0.7),
-          this.add.ellipse(31, -5, 30, 12, 0xffffff, 0.68)
+          this.add.circle(0, 2, 58, 0xb68ce9, 0.16).setBlendMode(Phaser.BlendModes.ADD),
+          this.add.ellipse(0, -13, 76, 52, 0xc698ee, 0.88).setStrokeStyle(4, 0xf0ddff, 0.78),
+          this.add.ellipse(-13, -23, 25, 11, 0xffffff, 0.3),
+          ...[-25, -13, 0, 13, 25].map((x, index) => this.add.line(0, 0, x, 5, x + (index % 2 ? 10 : -10), 62 + index % 3 * 7, index % 2 ? 0x70e1db : 0xc69cf0, 0.92).setOrigin(0))
         ];
-        label = "큰 파도";
+        label = "해파리";
       }
     } else if (chapter === "cave") {
       if (Math.random() < 0.5) {
@@ -1019,7 +1335,8 @@ export class MiniGameScene extends Phaser.Scene {
       gameId: this.gameId,
       score: Math.floor(this.score),
       playerPoints: this.oceanChapterIndex + 1,
-      computerPoints: distance
+      computerPoints: distance,
+      dha: Math.ceil(this.oceanDha)
     });
   }
 
@@ -1176,7 +1493,8 @@ export class MiniGameScene extends Phaser.Scene {
       gameId: this.gameId,
       score: Math.max(0, Math.min(10_000, Math.floor(this.score))),
       success,
-      durationMs: Math.max(500, Math.floor(this.time.now - this.startedAt))
+      durationMs: Math.max(500, Math.floor(this.time.now - this.startedAt)),
+      endReason: this.oceanDhaDepleted ? "dha-depleted" : undefined
     };
     this.scene.pause();
     gameBridge.emit("minigame:finish", result);
@@ -1184,6 +1502,7 @@ export class MiniGameScene extends Phaser.Scene {
 
   private successAtTimeout(): boolean {
     if (this.gameId === "ocean-run") return this.oceanChapterIndex === 3 && this.oceanGear.oxygenTank && this.oceanGear.submarine;
+    if (this.gameId === "jump-up") return this.jumpPhaseIndex === 3;
     if (this.gameId === "reef-memory" || this.gameId === "cave-sonar") return this.matchedPairs >= 4;
     if (this.gameId === "beach-football") return this.playerPoints >= 3;
     if (this.gameId === "beach-pingpong" || this.gameId === "beach-volleyball") return this.score > 0 && this.playerPoints >= this.computerPoints;

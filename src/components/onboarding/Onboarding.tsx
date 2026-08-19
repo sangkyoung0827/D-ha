@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   FUR_COLORS,
   PET_ACCESSORIES,
@@ -58,8 +58,12 @@ export function Onboarding() {
       <main className="onboarding create-screen pet-create-screen" data-testid="pet-creator">
         <p className="eyebrow">DIHA PET</p>
         <h1>함께할 반려동물을 골라요</h1>
-        <PetAvatar appearance={draft} testId="pet-preview" />
-        <p className="appearance-summary" aria-live="polite">{petDescription(draft)}<small>{draft.species === "dog" ? "강아지" : "고양이"} · 종 고유 특징을 유지해요</small></p>
+        <section className="pet-preview-stage" aria-label="실시간 반려동물 커스터마이징 미리보기">
+          <span className="pet-preview-quality"><i /> REAL FUR PREVIEW</span>
+          <PetAvatar appearance={draft} testId="pet-preview" />
+          <div className="pet-preview-floor" aria-hidden="true" />
+        </section>
+        <p className="appearance-summary" aria-live="polite">{petDescription(draft)}<small>{draft.species === "dog" ? "강아지" : "고양이"} · 품종의 얼굴·털·체형을 그대로 유지해요</small></p>
         <label className="field-label">이름<input value={draft.name} maxLength={20} onChange={(event) => setDraft({ ...draft, name: event.target.value })} aria-label="반려동물 이름" /></label>
         <fieldset className="picker species-picker"><legend>종</legend><div>
           <button type="button" className={draft.species === "dog" ? "selected" : ""} aria-pressed={draft.species === "dog"} onClick={() => selectSpecies("dog")}>🐶 강아지</button>
@@ -73,7 +77,7 @@ export function Onboarding() {
           aria-pressed={breed.id === draft.breed}
           data-testid={`pet-breed-${breed.id}`}
           onClick={() => setDraft({ ...draft, breed: breed.id, species: breed.species, furColor: breed.defaultFur, pattern: breed.defaultPattern })}
-        >{breed.label}</button>)}</div></fieldset>
+        ><i className={`breed-sample coat-${breed.coat}`} style={{ "--sample-fur": FUR_COLORS.find((color) => color.id === breed.defaultFur)?.color } as CSSProperties}><span /><b /></i><small>{breed.label}</small></button>)}</div></fieldset>
         <Picker label="털 색상" options={FUR_COLORS} value={draft.furColor} onChange={(furColor) => setDraft({ ...draft, furColor })} />
         <Picker label="기본 무늬" options={PET_PATTERNS} value={draft.pattern} onChange={(pattern) => setDraft({ ...draft, pattern })} />
         <Picker label="목걸이" options={PET_COLLARS} value={draft.collar} onChange={(collar) => setDraft({ ...draft, collar })} />
@@ -89,13 +93,13 @@ export function Onboarding() {
 
   return (
     <main className="onboarding tour-screen">
-      <div className="tour-map" aria-hidden="true"><span><GameIcon name="home" /></span><i /><span><GameIcon name="ocean" /></span><i /><span><GameIcon name="sparkles" /></span></div>
-      <p className="eyebrow">DIHA ORIENTATION</p>
-      <h1>돌보고, 놀고,<br />새 해역을 발견하세요.</h1>
+      <div className="tour-map" aria-hidden="true"><span><GameIcon name="home" /></span><i /><span><GameIcon name="heart" /></span><i /><span><GameIcon name="sparkles" /></span></div>
+      <p className="eyebrow">DIHA PET LIFE</p>
+      <h1>함께 살고, 돌보고,<br />매일 새로운 곳을 만나요.</h1>
       <ul className="tour-list">
-        <li><b>01</b><span><strong>네 가지 상태</strong>시간이 지나면 변하지만 최대 24시간까지만 반영돼요.</span></li>
-        <li><b>02</b><span><strong>7개의 공간</strong>먹고, 씻고, 쉬고, 스타일을 바꿀 수 있어요.</span></li>
-        <li><b>03</b><span><strong>7개의 Ocean Games</strong>코인과 경험치를 얻어 새로운 해역을 열어요.</span></li>
+        <li><b>01</b><span><strong>우리 집</strong>자기 집에서 쉬고 조이스틱으로 집 안을 자유롭게 걸어요.</span></li>
+        <li><b>02</b><span><strong>반려동물 장소</strong>동물병원, 애견 카페, 산책로, 미용실과 펫샵을 만나보세요.</span></li>
+        <li><b>03</b><span><strong>나만의 모습</strong>품종 고유 체형을 유지하면서 털, 무늬와 액세서리를 바꿔요.</span></li>
       </ul>
       <button className="primary-button wide" onClick={finishTutorial}>Home 입장 · 보상 받기</button>
     </main>

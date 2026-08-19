@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import * as THREE from "three";
 import { COLLAR_COLORS, OUTFIT_COLORS, breedDefinition, furColorValue, petAccentColor, petDescription, type PetAppearance } from "../../domain/pet";
 import { ITEM_BY_ID } from "../../domain/catalog";
@@ -18,6 +18,7 @@ interface Home3DCanvasProps {
 
 interface PetRig {
   root: THREE.Group;
+  body: THREE.Mesh;
   legs: [THREE.Group, THREE.Group, THREE.Group, THREE.Group];
   tail: THREE.Group;
   head: THREE.Group;
@@ -56,13 +57,55 @@ const ROOM_CENTER: Record<IndoorRoom, THREE.Vector3> = {
   wardrobe: new THREE.Vector3(6.5, 0, -2.65)
 };
 
+const PET_PLACE_MENU = [
+  { id: "hospital", icon: "✚", label: "동물병원", caption: "건강 기록과 진료" },
+  { id: "cafe", icon: "☕", label: "애견 카페", caption: "친구들과 교감" },
+  { id: "walk", icon: "♧", label: "산책로", caption: "산책과 탐험" },
+  { id: "grooming", icon: "✂", label: "미용실", caption: "목욕과 그루밍" },
+  { id: "shop", icon: "◈", label: "펫샵", caption: "용품과 스타일" }
+] as const;
+
 export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion, tired, onRoomChange }: Home3DCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<HomeController | null>(null);
+  const joystickVectorRef = useRef({ x: 0, y: 0 });
+  const joystickPointerRef = useRef<number | null>(null);
   const onRoomChangeRef = useRef(onRoomChange);
   const activeRoomRef = useRef<IndoorRoom>(currentRoom);
   const selfRoomUpdateRef = useRef<IndoorRoom | null>(null);
-  const [message, setMessage] = useState("바닥을 눌러 걷고, 문을 눌러 열어보세요");
+  const [message, setMessage] = useState("자기 집에서 쉬는 중 · 조이스틱으로 움직여보세요");
+  const [joystickPosition, setJoystickPosition] = useState({ x: 0, y: 0, active: false });
+  const [selectedPlace, setSelectedPlace] = useState<(typeof PET_PLACE_MENU)[number]>(PET_PLACE_MENU[2]);
+
+  const moveJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (joystickPointerRef.current !== event.pointerId) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const radius = Math.max(1, Math.min(bounds.width, bounds.height) * 0.34);
+    const rawX = event.clientX - (bounds.left + bounds.width / 2);
+    const rawY = event.clientY - (bounds.top + bounds.height / 2);
+    const distance = Math.hypot(rawX, rawY);
+    const scale = distance > radius ? radius / distance : 1;
+    const x = rawX * scale;
+    const y = rawY * scale;
+    joystickVectorRef.current = { x: x / radius, y: y / radius };
+    setJoystickPosition({ x, y, active: true });
+  };
+
+  const startJoystick = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    joystickPointerRef.current = event.pointerId;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setMessage("조이스틱을 끌어 원하는 방향으로 이동하세요");
+    moveJoystick(event);
+  };
+
+  const stopJoystick = (event?: ReactPointerEvent<HTMLDivElement>) => {
+    if (event && joystickPointerRef.current !== event.pointerId) return;
+    if (event?.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    joystickPointerRef.current = null;
+    joystickVectorRef.current = { x: 0, y: 0 };
+    setJoystickPosition({ x: 0, y: 0, active: false });
+  };
 
   useEffect(() => { onRoomChangeRef.current = onRoomChange; }, [onRoomChange]);
   useEffect(() => {
@@ -100,6 +143,7 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
     addOceanExterior(world);
     addHouseShell(world);
     addLivingRoom(world);
+    addPetHome(world);
     addKitchen(world);
     addBathroom(world);
     addBedroom(world);
@@ -111,6 +155,7 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
     rig.root.position.copy(start);
     rig.root.rotation.y = 0;
     world.add(rig.root);
+    if (activeRoomRef.current === "studio") camera.position.copy(start).add(new THREE.Vector3(0, 1.9, -2.85));
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -120,11 +165,15 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
     const keys = new Set<string>();
     const clock = new THREE.Clock();
     const forward = new THREE.Vector3(0, 0, -1);
+    const joystickForwardBasis = new THREE.Vector3(0, 0, -1);
+    const joystickRightBasis = new THREE.Vector3(1, 0, 0);
     const cameraTarget = new THREE.Vector3();
     let moving = false;
     let stepTime = 0;
     let routeSpeed = 2.75;
     let disposed = false;
+    let joystickGestureActive = false;
+    let settledAtPetHome = activeRoomRef.current === "studio";
     let reaction: "eat" | "sleep" | "wash" | "happy" | "jump" | null = null;
     let reactionStartedAt = 0;
     const stopPetReaction = gameBridge.on("pet:react", ({ action }) => {
@@ -252,14 +301,32 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
         0,
         Number(keys.has("ArrowDown") || keys.has("KeyS")) - Number(keys.has("ArrowUp") || keys.has("KeyW"))
       );
+      const joystick = joystickVectorRef.current;
+      const joystickMagnitude = Math.min(1, Math.hypot(joystick.x, joystick.y));
       let desired: THREE.Vector3 | null = null;
-      if (keyboardDirection.lengthSq() > 0) {
+      if (joystickMagnitude > 0.08) {
+        if (!joystickGestureActive) {
+          joystickForwardBasis.copy(forward).normalize();
+          joystickRightBasis.set(-forward.z, 0, forward.x).normalize();
+          joystickGestureActive = true;
+        }
+        const joystickDirection = joystickForwardBasis.clone().multiplyScalar(-joystick.y).addScaledVector(joystickRightBasis, joystick.x).normalize();
+        routeSpeed = 1.65 + joystickMagnitude * 2.25;
+        desired = rig.root.position.clone().addScaledVector(joystickDirection, delta * routeSpeed);
+        desired = constrainStep(rig.root.position, desired, doors);
+        path.length = 0;
+      } else if (keyboardDirection.lengthSq() > 0) {
+        joystickGestureActive = false;
         keyboardDirection.normalize();
+        routeSpeed = 3.1;
         desired = rig.root.position.clone().addScaledVector(keyboardDirection, delta * 3.1);
         desired = constrainStep(rig.root.position, desired, doors);
         path.length = 0;
       } else if (path.length > 0) {
+        joystickGestureActive = false;
         desired = path[0] ?? null;
+      } else {
+        joystickGestureActive = false;
       }
 
       moving = false;
@@ -275,6 +342,7 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
           rig.root.rotation.y = dampAngle(rig.root.rotation.y, desiredRotation, reducedMotion ? 1 : Math.min(1, delta * 10));
           forward.copy(direction);
           moving = true;
+          settledAtPetHome = false;
         } else if (path.length > 0) {
           path.shift();
         }
@@ -295,6 +363,21 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
       rig.head.rotation.z = reducedMotion ? 0 : Math.sin(stepTime * 0.5) * (moving ? 0.025 : 0.055);
       rig.head.rotation.x = 0;
       rig.root.rotation.z = 0;
+      const seated = settledAtPetHome && !moving && activeRoomRef.current === "studio" && !reaction;
+      const poseEase = reducedMotion ? 1 : Math.min(1, delta * 7);
+      rig.body.rotation.x = THREE.MathUtils.lerp(rig.body.rotation.x, seated ? Math.PI / 2 + 0.31 : Math.PI / 2, poseEase);
+      rig.body.position.y = THREE.MathUtils.lerp(rig.body.position.y, seated ? 0.72 : 0.66, poseEase);
+      rig.head.position.y = THREE.MathUtils.lerp(rig.head.position.y, seated ? 1.08 : 0.91, poseEase);
+      rig.head.position.z = THREE.MathUtils.lerp(rig.head.position.z, seated ? -0.47 : -0.59, poseEase);
+      for (let index = 0; index < rig.legs.length; index += 1) {
+        const leg = rig.legs[index];
+        if (!leg) continue;
+        const rear = index > 1;
+        const baseZ = rear ? 0.36 : -0.31;
+        leg.position.y = THREE.MathUtils.lerp(leg.position.y, seated && rear ? 0.38 : 0.56, poseEase);
+        leg.position.z = THREE.MathUtils.lerp(leg.position.z, seated && rear ? 0.47 : baseZ, poseEase);
+        if (seated) leg.rotation.x = THREE.MathUtils.lerp(leg.rotation.x, rear ? -1.18 : 0.08, poseEase);
+      }
       let reactionLift = 0;
       if (reaction) {
         const elapsed = (performance.now() - reactionStartedAt) / 1000;
@@ -313,9 +396,12 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
     };
 
     const updateCamera = (delta: number) => {
+      const showingPetHome = settledAtPetHome && activeRoomRef.current === "studio";
       const behind = forward.clone().multiplyScalar(-2.4);
       const shoulder = new THREE.Vector3(forward.z, 0, -forward.x).multiplyScalar(0.8);
-      const desired = rig.root.position.clone().add(behind).add(shoulder).add(new THREE.Vector3(0, 3.25, 0));
+      const desired = showingPetHome
+        ? rig.root.position.clone().add(new THREE.Vector3(0, 1.9, -2.85))
+        : rig.root.position.clone().add(behind).add(shoulder).add(new THREE.Vector3(0, 3.25, 0));
       const currentRoom = roomAt(rig.root.position);
       if (currentRoom === "studio") desired.z = Math.min(desired.z, 6.62);
       else desired.z = Math.min(desired.z, -0.58);
@@ -323,7 +409,8 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
       desired.z = THREE.MathUtils.clamp(desired.z, -7.6, 12.8);
       const alpha = 1 - Math.exp(-delta * (reducedMotion ? 20 : 4.8));
       camera.position.lerp(desired, alpha);
-      cameraTarget.copy(rig.root.position).addScaledVector(forward, 1.45).setY(1.25);
+      if (showingPetHome) cameraTarget.copy(rig.root.position).add(new THREE.Vector3(0, 0.95, 0));
+      else cameraTarget.copy(rig.root.position).addScaledVector(forward, 1.45).setY(1.25);
       camera.lookAt(cameraTarget);
     };
 
@@ -351,8 +438,10 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
           object.geometry.dispose();
           const materials = Array.isArray(object.material) ? object.material : [object.material];
           materials.forEach((material) => {
-            const texture = (material as THREE.MeshStandardMaterial).map;
-            if (texture) texture.dispose();
+            const textured = material as THREE.MeshStandardMaterial;
+            if (textured.map) textured.map.dispose();
+            if (textured.bumpMap) textured.bumpMap.dispose();
+            if (textured.roughnessMap) textured.roughnessMap.dispose();
             material.dispose();
           });
         }
@@ -372,15 +461,50 @@ export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion,
     data-pattern={appearance.pattern}
     data-accessory={appearance.accessory}
     data-outfit={appearance.outfit}
+    data-initial-view="pet-front-home"
   >
     <div className="home3d-compass" aria-live="polite"><span>3D HOME</span><strong>{ROOM_LABEL[currentRoom]}</strong><small>{message}</small></div>
-    <div className="home3d-controls" aria-hidden="true"><kbd>WASD</kbd><span>또는 바닥 터치</span></div>
-    {(["studio", "kitchen", "bathroom", "bedroom", "wardrobe", "wellness"] as const).map((room) => <button
+    <nav className="pet-place-menu" aria-label="반려동물 장소">
+      <span className="pet-place-menu-title">PET PLACES</span>
+      {PET_PLACE_MENU.map((place) => <button
+        key={place.id}
+        type="button"
+        className={selectedPlace.id === place.id ? "active" : ""}
+        aria-label={`${place.label}: ${place.caption}`}
+        aria-pressed={selectedPlace.id === place.id}
+        data-testid={`pet-place-${place.id}`}
+        onClick={() => { setSelectedPlace(place); setMessage(`${place.label} · ${place.caption}`); }}
+      ><b aria-hidden="true">{place.icon}</b><span><strong>{place.label}</strong><small>{place.caption}</small></span></button>)}
+    </nav>
+    <div className="home3d-controls" aria-hidden="true"><kbd>WASD</kbd><span>조이스틱 · 바닥 터치</span></div>
+    <div
+      className={`home3d-joystick ${joystickPosition.active ? "is-active" : ""}`}
+      data-testid="home3d-joystick"
+      role="application"
+      tabIndex={0}
+      aria-label="이동 조이스틱. 가운데 버튼을 누른 채 원하는 방향으로 끌어 이동합니다."
+      onPointerDown={startJoystick}
+      onPointerMove={moveJoystick}
+      onPointerUp={stopJoystick}
+      onPointerCancel={stopJoystick}
+      onLostPointerCapture={() => stopJoystick()}
+    >
+      <span className="home3d-joystick-ring" aria-hidden="true" />
+      <i
+        className="home3d-joystick-knob"
+        data-testid="home3d-joystick-knob"
+        data-active={joystickPosition.active}
+        style={{ transform: `translate3d(${joystickPosition.x}px, ${joystickPosition.y}px, 0)` }}
+        aria-hidden="true"
+      />
+      <small aria-hidden="true">MOVE</small>
+    </div>
+    {(["studio", "kitchen", "bathroom", "bedroom", "wardrobe"] as const).map((room) => <button
       key={room}
       className="sr-only home3d-access-door"
       data-testid={`home3d-door-${room}`}
       onClick={() => controllerRef.current?.visit(room)}
-    >{room === "wellness" ? "Ocean" : ROOM_LABEL[room]} 문 열고 이동</button>)}
+    >{ROOM_LABEL[room]} 문 열고 이동</button>)}
   </div>;
 }
 
@@ -497,6 +621,36 @@ function addLivingRoom(world: THREE.Group): void {
   world.add(mediaWall);
 }
 
+function addPetHome(world: THREE.Group): void {
+  const home = new THREE.Group();
+  home.position.set(0, 0, 5.56);
+  const wood = new THREE.MeshStandardMaterial({ color: 0xb67843, roughness: 0.78, metalness: 0.01 });
+  const trim = new THREE.MeshStandardMaterial({ color: 0xf1d3a5, roughness: 0.72 });
+  const inside = new THREE.MeshStandardMaterial({ color: 0x30231e, roughness: 1 });
+  const cushionMaterial = new THREE.MeshPhysicalMaterial({ color: 0x6aa79b, roughness: 0.82, sheen: 0.28, sheenColor: new THREE.Color(0xc8fff1) });
+
+  const back = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.72, 0.16), wood); back.position.set(0, 0.9, 0.72); home.add(back);
+  for (const x of [-1.08, 1.08]) {
+    const side = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.62, 1.62), wood); side.position.set(x, 0.82, 0); side.castShadow = true; home.add(side);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1.52, 0.22), trim); post.position.set(x, 0.78, -0.8); post.castShadow = true; home.add(post);
+  }
+  const doorway = new THREE.Mesh(new THREE.PlaneGeometry(1.34, 1.12), inside); doorway.position.set(0, 0.67, -0.815); home.add(doorway);
+  const arch = new THREE.Mesh(new THREE.CircleGeometry(0.67, 32, 0, Math.PI), inside); arch.position.set(0, 1.23, -0.817); home.add(arch);
+  const sill = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.14, 0.28), trim); sill.position.set(0, 0.07, -0.82); home.add(sill);
+  for (const side of [-1, 1]) {
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.17, 2.12), new THREE.MeshStandardMaterial({ color: 0x885238, roughness: 0.74 }));
+    roof.position.set(side * 0.57, 1.82, 0); roof.rotation.z = side * -0.48; roof.castShadow = true; home.add(roof);
+  }
+  const cushion = new THREE.Mesh(new THREE.CapsuleGeometry(0.46, 1.12, 8, 22), cushionMaterial);
+  cushion.rotation.z = Math.PI / 2; cushion.scale.set(1, 1, 0.58); cushion.position.set(0, 0.12, -0.72); cushion.receiveShadow = true; home.add(cushion);
+  const plaque = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.3, 0.07), trim); plaque.position.set(0, 1.64, -0.93); plaque.castShadow = true; home.add(plaque);
+  const plaqueMark = new THREE.Mesh(new THREE.CircleGeometry(0.09, 20), new THREE.MeshStandardMaterial({ color: 0x4d6f67, roughness: 0.6 })); plaqueMark.position.set(0, 1.64, -0.97); home.add(plaqueMark);
+  world.add(home);
+
+  const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.22, 0.18, 24, 1, true), new THREE.MeshPhysicalMaterial({ color: 0xd4b05b, metalness: 0.45, roughness: 0.3, side: THREE.DoubleSide }));
+  bowl.position.set(1.45, 0.1, 4.56); bowl.castShadow = true; world.add(bowl);
+}
+
 function addKitchen(world: THREE.Group): void {
   const cabinet = new THREE.MeshStandardMaterial({ color: 0xb87945, roughness: 0.64 });
   const stone = new THREE.MeshStandardMaterial({ color: 0xf2e4ce, roughness: 0.38 });
@@ -550,8 +704,7 @@ function createDoors(world: THREE.Group): DoorView[] {
     { id: "kitchen", target: "kitchen", room: "kitchen", x: -5.5, z: 0, color: 0xc28a58 },
     { id: "bathroom", target: "bathroom", room: "bathroom", x: -1.5, z: 0, color: 0x7fb1aa },
     { id: "bedroom", target: "bedroom", room: "bedroom", x: 2.5, z: 0, color: 0x7e8eac },
-    { id: "wardrobe", target: "wardrobe", room: "wardrobe", x: 6.5, z: 0, color: 0xb18360 },
-    { id: "ocean", target: "wellness", room: "studio", x: 0, z: 7, color: 0x4e9ca3 }
+    { id: "wardrobe", target: "wardrobe", room: "wardrobe", x: 6.5, z: 0, color: 0xb18360 }
   ];
   return specs.map((spec) => {
     const pivot = new THREE.Group();
@@ -571,19 +724,49 @@ function createDoors(world: THREE.Group): DoorView[] {
   });
 }
 
+function createFurDetailTexture(coat: ReturnType<typeof breedDefinition>["coat"]): THREE.CanvasTexture {
+  const canvas = document.createElement("canvas");
+  canvas.width = 256;
+  canvas.height = 256;
+  const context = canvas.getContext("2d")!;
+  context.fillStyle = "#808080";
+  context.fillRect(0, 0, 256, 256);
+  const strandCount = coat === "short" ? 1800 : coat === "silky" ? 1000 : 760;
+  for (let index = 0; index < strandCount; index += 1) {
+    const x = Math.random() * 256;
+    const y = Math.random() * 256;
+    const length = coat === "short" ? 1 + Math.random() * 2 : 3 + Math.random() * 8;
+    const shade = 78 + Math.floor(Math.random() * 92);
+    context.strokeStyle = `rgba(${shade},${shade},${shade},${coat === "short" ? 0.42 : 0.3})`;
+    context.lineWidth = coat === "curly" ? 1.7 : 0.8;
+    context.beginPath();
+    context.moveTo(x, y);
+    if (coat === "curly" || coat === "fluffy") context.quadraticCurveTo(x + 3, y + length / 2, x, y + length);
+    else context.lineTo(x + (coat === "silky" || coat === "long" ? 1.5 : 0), y + length);
+    context.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(coat === "short" ? 4 : 2.4, coat === "short" ? 4 : 2.4);
+  texture.anisotropy = 8;
+  return texture;
+}
+
 function createPetRig(appearance: PetAppearance, equipped: Record<WearableSlot, string | null>): PetRig {
   const root = new THREE.Group();
   const renderedAppearance: PetAppearance = appearance.accessory === "none" && equipped.accessory ? { ...appearance, accessory: "round" } : appearance;
   const breed = breedDefinition(appearance.breed);
   const size = breed.size === "large" ? 1.18 : breed.size === "small" ? 0.88 : 1;
   root.scale.setScalar(size);
-  const fur = new THREE.MeshStandardMaterial({ color: furColorValue(appearance.furColor), roughness: breed.coat === "short" ? 0.58 : 0.9 });
-  const accent = new THREE.MeshStandardMaterial({ color: petAccentColor(appearance), roughness: 0.82 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x25363b, roughness: 0.35 });
+  const furTexture = createFurDetailTexture(breed.coat);
+  const furColor = new THREE.Color(furColorValue(appearance.furColor));
+  const fur = new THREE.MeshPhysicalMaterial({ color: furColor, roughness: breed.coat === "short" ? 0.68 : 0.93, bumpMap: furTexture, bumpScale: breed.coat === "short" ? 0.016 : 0.035, sheen: breed.coat === "short" ? 0.12 : 0.38, sheenColor: furColor.clone().lerp(new THREE.Color(0xffffff), 0.55), clearcoat: breed.coat === "short" ? 0.06 : 0.01 });
+  const accent = new THREE.MeshPhysicalMaterial({ color: petAccentColor(appearance), roughness: 0.86, bumpMap: furTexture, bumpScale: 0.025, sheen: 0.22 });
+  const dark = new THREE.MeshPhysicalMaterial({ color: 0x171d1e, roughness: 0.24, clearcoat: 0.62, clearcoatRoughness: 0.16 });
   const topColor = equipped.top ? ITEM_BY_ID[equipped.top]?.color : undefined;
   const outfitColor = topColor ?? (appearance.outfit === "none" ? null : OUTFIT_COLORS[appearance.outfit]);
 
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.68, 8, 20), fur);
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.68, 12, 28), fur);
   body.rotation.x = Math.PI / 2; body.position.set(0, 0.66, 0.05); body.scale.set(1.08, 1, 0.94); body.castShadow = true; root.add(body);
   if (outfitColor) {
     const clothing = new THREE.Mesh(new THREE.CapsuleGeometry(0.355, 0.43, 8, 20), new THREE.MeshStandardMaterial({ color: outfitColor, roughness: 0.68 }));
@@ -598,14 +781,22 @@ function createPetRig(appearance: PetAppearance, equipped: Record<WearableSlot, 
   }
 
   const head = new THREE.Group(); head.position.set(0, 0.91, -0.59); root.add(head);
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.38, 26, 20), fur); skull.scale.set(1, 0.96, breed.muzzle === "short" ? 0.86 : 0.96); skull.castShadow = true; head.add(skull);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.38, 36, 28), fur); skull.scale.set(breed.coat === "fluffy" || breed.coat === "curly" ? 1.06 : 1, breed.id === "maltese" ? 1.02 : 0.96, breed.muzzle === "short" ? 0.86 : 0.96); skull.castShadow = true; head.add(skull);
   const muzzleLength = breed.muzzle === "long" ? 0.31 : breed.muzzle === "medium" ? 0.24 : 0.19;
-  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.2, 18, 14), new THREE.MeshStandardMaterial({ color: 0xf2e7d6, roughness: 0.8 })); muzzle.scale.set(1.18, 0.72, muzzleLength / 0.2); muzzle.position.set(0, -0.08, -0.32); muzzle.castShadow = true; head.add(muzzle);
-  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.065, 14, 10), dark); nose.scale.set(1.15, 0.78, 0.68); nose.position.set(0, -0.035, -0.5 - (muzzleLength - 0.19) * 0.55); head.add(nose);
+  const muzzleColor = furColor.clone().lerp(new THREE.Color(0xfff8ec), appearance.furColor === "snow" ? 0.2 : 0.42);
+  const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.2, 28, 20), new THREE.MeshPhysicalMaterial({ color: muzzleColor, roughness: 0.9, bumpMap: furTexture, bumpScale: 0.028, sheen: 0.24 })); muzzle.scale.set(1.18, 0.72, muzzleLength / 0.2); muzzle.position.set(0, -0.08, -0.32); muzzle.castShadow = true; head.add(muzzle);
+  const noseScale = breed.id === "maltese" || breed.id === "bichon" ? 1.12 : 1;
+  const nose = new THREE.Mesh(new THREE.SphereGeometry(0.068 * noseScale, 22, 16), dark); nose.scale.set(1.18, 0.78, 0.72); nose.position.set(0, -0.035, -0.5 - (muzzleLength - 0.19) * 0.55); head.add(nose);
+  for (const side of [-1, 1]) { const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.012, 10, 8), new THREE.MeshBasicMaterial({ color: 0x030505 })); nostril.scale.set(1.4, 0.55, 0.5); nostril.position.set(side * 0.031, -0.031, nose.position.z - 0.055); head.add(nostril); }
 
-  const eyeMaterial = new THREE.MeshStandardMaterial({ color: appearance.species === "cat" ? 0x3d796c : 0x20383e, roughness: 0.2, metalness: 0.05 });
-  for (const x of [-0.14, 0.14]) { const eye = new THREE.Mesh(new THREE.SphereGeometry(0.043, 12, 10), eyeMaterial); eye.position.set(x, 0.08, -0.33); head.add(eye); const glint = new THREE.Mesh(new THREE.SphereGeometry(0.012, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff })); glint.position.set(x - 0.012, 0.097, -0.37); head.add(glint); }
-  addPetEars(head, appearance, fur, accent);
+  const eyeMaterial = new THREE.MeshPhysicalMaterial({ color: appearance.species === "cat" ? 0x467c68 : 0x171f22, roughness: 0.08, clearcoat: 1, clearcoatRoughness: 0.02 });
+  const eyeRadius = breed.id === "maltese" || breed.id === "bichon" || breed.id === "persian" ? 0.061 : 0.052;
+  for (const x of [-0.14, 0.14]) {
+    const eyeRim = new THREE.Mesh(new THREE.SphereGeometry(eyeRadius * 1.16, 20, 16), new THREE.MeshStandardMaterial({ color: 0x2f2522, roughness: 0.55 })); eyeRim.scale.set(1, 1.04, 0.4); eyeRim.position.set(x, 0.08, -0.335); head.add(eyeRim);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(eyeRadius, 24, 18), eyeMaterial); eye.scale.set(1, 1.05, 0.72); eye.position.set(x, 0.08, -0.37); head.add(eye);
+    const glint = new THREE.Mesh(new THREE.SphereGeometry(eyeRadius * 0.28, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff })); glint.position.set(x - eyeRadius * 0.27, 0.102, -0.417); head.add(glint);
+  }
+  addPetEars(head, appearance, fur);
   addPetCoat(head, appearance, fur);
   addPetAccessories(head, renderedAppearance);
 
@@ -627,15 +818,15 @@ function createPetRig(appearance: PetAppearance, equipped: Record<WearableSlot, 
   const tail = new THREE.Group(); tail.position.set(0, 0.79, 0.58); tail.rotation.z = 0.45; root.add(tail);
   const tailMesh = new THREE.Mesh(new THREE.CapsuleGeometry(appearance.species === "cat" ? 0.07 : 0.11, appearance.species === "cat" ? 0.72 : 0.5, 7, 14), fur); tailMesh.position.y = 0.34; tailMesh.rotation.z = appearance.species === "cat" ? -0.25 : -0.45; tailMesh.castShadow = true; tail.add(tailMesh);
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(0.64, 32), new THREE.MeshBasicMaterial({ color: 0x14333a, transparent: true, opacity: 0.22, depthWrite: false })); shadow.scale.set(1, 1.45, 1); shadow.rotation.x = -Math.PI / 2; shadow.position.y = 0.012; root.add(shadow);
-  return { root, legs, tail, head };
+  return { root, body, legs, tail, head };
 }
 
-function addPetEars(head: THREE.Group, appearance: PetAppearance, fur: THREE.Material, accent: THREE.Material): void {
+function addPetEars(head: THREE.Group, appearance: PetAppearance, fur: THREE.Material): void {
   const breed = breedDefinition(appearance.breed);
   for (const side of [-1, 1]) {
     const geometry = breed.ears === "drop" ? new THREE.CapsuleGeometry(0.11, 0.37, 6, 12) : new THREE.ConeGeometry(0.17, breed.ears === "round" ? 0.28 : 0.42, breed.ears === "round" ? 18 : 4);
     const ear = new THREE.Mesh(geometry, fur); ear.position.set(side * 0.27, breed.ears === "drop" ? -0.01 : 0.3, breed.ears === "drop" ? -0.01 : -0.01); ear.rotation.z = side * (breed.ears === "drop" ? -0.35 : -0.15); ear.castShadow = true; head.add(ear);
-    if (breed.ears !== "drop") { const inner = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.26, breed.ears === "round" ? 14 : 4), accent); inner.position.set(side * 0.27, 0.3, -0.05); inner.rotation.z = side * -0.15; inner.scale.set(0.8, 0.8, 0.45); head.add(inner); }
+    if (breed.ears !== "drop") { const inner = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.26, breed.ears === "round" ? 14 : 4), new THREE.MeshStandardMaterial({ color: appearance.species === "cat" ? 0xd9a9a5 : petAccentColor(appearance), roughness: 0.88 })); inner.position.set(side * 0.27, 0.3, -0.05); inner.rotation.z = side * -0.15; inner.scale.set(0.8, 0.8, 0.45); head.add(inner); }
   }
 }
 

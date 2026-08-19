@@ -91,10 +91,11 @@ describe("경제와 성장", () => {
 });
 
 describe("바다 생태계 진행", () => {
-  it("기존 Ocean 게임 대신 네 챕터가 연결된 단일 Ocean Run만 제공한다", () => {
-    expect(Array.from(OCEAN_GAME_BY_ID.keys())).toEqual(["ocean-run"]);
+  it("Ocean 게임 선택은 Ocean Run과 Jump Up 두 개만 제공한다", () => {
+    expect(Array.from(OCEAN_GAME_BY_ID.keys())).toEqual(["ocean-run", "jump-up"]);
     expect(OCEAN_RUN_CHAPTERS.map((chapter) => chapter.id)).toEqual(["beach", "surf", "cave", "deepsea"]);
     expect(isOceanGame("ocean-run")).toBe(true);
+    expect(isOceanGame("jump-up")).toBe(true);
     expect(isOceanGame("beach-volleyball")).toBe(false);
   });
 

@@ -23,6 +23,8 @@ export interface NeedValues {
 export type ItemCategory =
   | "food"
   | "wellness"
+  | "dha-bundle"
+  | "pet-health"
   | "ocean-gear"
   | "top"
   | "bottom"
@@ -98,6 +100,7 @@ export type MiniGameId =
   | "current-run"
   | "reef-memory"
   | "ocean-run"
+  | "jump-up"
   | "beach-volleyball"
   | "beach-pingpong"
   | "beach-football"
@@ -111,6 +114,7 @@ export interface MiniGameResult {
   score: number;
   success: boolean;
   durationMs: number;
+  endReason?: "dha-depleted";
 }
 
 export interface GameSave {

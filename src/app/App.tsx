@@ -18,6 +18,7 @@ import { startPwaUpdate } from "../platform/pwa/update";
 import { useAccount } from "../platform/auth/AccountProvider";
 import { GoogleSignInScreen } from "../components/auth/GoogleSignInScreen";
 import { isHomeInterior } from "../domain/home";
+import { HomePetScene } from "../components/game-ui/HomePetScene";
 
 const Home3DCanvas = lazy(() => import("../components/game-ui/Home3DCanvas").then((module) => ({ default: module.Home3DCanvas })));
 
@@ -36,6 +37,7 @@ export function App() {
   const settings = useGameStore((state) => state.settings);
   const activeMiniGame = useGameStore((state) => state.activeMiniGame);
   const toast = useGameStore((state) => state.toast);
+  const overlay = useGameStore((state) => state.overlay);
   const highScores = useGameStore((state) => state.highScores);
   const inventory = useGameStore((state) => state.inventory);
   const recoveryMessage = useGameStore((state) => state.recoveryMessage);
@@ -127,19 +129,20 @@ export function App() {
       <main className="game-shell" data-testid="game-shell">
         <StatusBar needs={needs} />
         <GameRoom room={currentRoom} petName={profile.name} immersive={Boolean(activeMiniGame)}>
-          {!activeMiniGame && isHomeInterior(currentRoom)
+          {!activeMiniGame && currentRoom === "studio"
+            ? <HomePetScene appearance={profile} reducedMotion={settings.reducedMotion} onRoomChange={(room) => { setBathProgress(0); setRoom(room); }} />
+            : !activeMiniGame && isHomeInterior(currentRoom)
             ? <Suspense fallback={<div className="home3d-loading" role="status">3D 집을 여는 중...</div>}><Home3DCanvas currentRoom={currentRoom} equipped={equipped} appearance={profile} reducedMotion={settings.reducedMotion} tired={needs.energy < 25} onRoomChange={(room) => {
                   if (room === "wellness") { setOceanMode("exploration"); setOceanZone("beach"); }
                   setBathProgress(0);
                   setRoom(room);
                 }} /></Suspense>
             : <GameCanvas room={currentRoom} theme={roomTheme} equipped={equipped} appearance={profile} reducedMotion={settings.reducedMotion} oceanMode={oceanMode} oceanZone={oceanZone} oceanGear={ownsOceanGear(inventory)} activeMiniGame={activeMiniGame} onMiniGameFinish={handleMiniGameFinish} onBathComplete={handleBathComplete} onBathProgress={handleBathProgress} />}
-          {!activeMiniGame && currentRoom === "studio" && <div className="home-control-hint"><span>☝</span><strong>3D 바닥을 눌러 걷기</strong><small>문을 누르면 열고 이동해요</small></div>}
           {!activeMiniGame && currentRoom !== "studio" && currentRoom !== "wellness" && <ContextTray room={currentRoom} bathProgress={bathProgress} />}
           {!activeMiniGame && currentRoom === "wellness" && <OceanHub mode={oceanMode} zone={oceanZone} highScores={highScores} oceanGear={ownsOceanGear(inventory)} onModeChange={setOceanMode} onZoneChange={setOceanZone} onStartGame={(id) => void startGame(id)} onOpenShop={() => setOverlay("shop")} />}
           {activeMiniGame && <MiniGameOverlay id={activeMiniGame} result={pendingResult} debug={debug} onClaim={claimReward} onExit={() => { const returnRoom = isOceanGame(activeMiniGame) ? "wellness" : "game-room"; setPendingResult(null); setActiveMiniGame(null); setRoom(returnRoom); }} />}
         </GameRoom>
-        <RoomNav current={currentRoom} onChange={changeRoom} />
+        <RoomNav current={currentRoom} shopActive={overlay === "pet-store"} onChange={changeRoom} onOpenShop={() => setOverlay("pet-store")} />
       </main>
       <OverlayHost />
       {debug && <DebugPanel />}

@@ -22,7 +22,7 @@ import { clearGame, loadGame, saveGame } from "./persistence";
 import { parseImportedSave } from "./migrations";
 import { newestAccountSave } from "./accountSave";
 
-export type OverlayId = "none" | "fridge" | "inventory" | "shop" | "wardrobe" | "achievements" | "friends" | "settings" | "daily" | "notifications";
+export type OverlayId = "none" | "fridge" | "inventory" | "shop" | "pet-store" | "wardrobe" | "achievements" | "friends" | "settings" | "daily" | "notifications";
 
 interface GameRuntime {
   hydrated: boolean;

@@ -33,13 +33,15 @@ export function PetAvatar({ appearance, className = "", testId }: { appearance: 
       aria-label={`반려동물 미리보기: ${petDescription(appearance)}`}
     >
       <span className="pet-tail" />
-      <span className="pet-body"><i className="pet-outfit" /></span>
+      <span className="pet-body"><i className="pet-fur-grain" /><i className="pet-outfit" /><b className="pet-chest-fur" /></span>
       <span className="pet-leg front-left" /><span className="pet-leg front-right" />
       <span className="pet-head">
         <i className="pet-ear left" /><i className="pet-ear right" />
         <b className="pet-marking" />
+        <b className="pet-brow left" /><b className="pet-brow right" />
         <em className="pet-eye left" /><em className="pet-eye right" />
-        <span className="pet-muzzle"><i /></span>
+        <span className="pet-muzzle"><i /><b /></span>
+        <span className="pet-whiskers left" /><span className="pet-whiskers right" />
         <span className={`pet-accessory accessory-${appearance.accessory}`}><i /><i /></span>
         <span className={`pet-hat hat-${appearance.hat}`} />
       </span>

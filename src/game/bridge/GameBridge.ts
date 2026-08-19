@@ -19,7 +19,9 @@ export interface BridgeEvents {
   "minigame:restart": undefined;
   "minigame:move": { direction: -1 | 1 };
   "minigame:action": undefined;
-  "minigame:progress": { gameId: MiniGameResult["gameId"]; score: number; playerPoints: number; computerPoints: number };
+  "minigame:progress": { gameId: MiniGameResult["gameId"]; score: number; playerPoints: number; computerPoints: number; dha?: number };
+  "minigame:debug-dha": { value: number };
+  "minigame:debug-jump-space": undefined;
   "minigame:demo-finish": undefined;
 }
 
