@@ -4,16 +4,13 @@ import type { MiniGameResult } from "../../domain/types";
 
 interface OceanHubProps {
   mode: OceanMode;
-  zone: OceanZoneId;
   highScores: Record<string, number>;
-  oceanGear: { oxygenTank: boolean; submarine: boolean };
   onModeChange(mode: OceanMode): void;
   onZoneChange(zone: OceanZoneId): void;
   onStartGame(id: MiniGameResult["gameId"]): void;
-  onOpenShop(): void;
 }
 
-export function OceanHub({ mode, highScores, onModeChange, onZoneChange, onStartGame, onOpenShop }: OceanHubProps) {
+export function OceanHub({ mode, highScores, onModeChange, onZoneChange, onStartGame }: OceanHubProps) {
   const [gamesOpen, setGamesOpen] = useState(false);
 
   const toggleGames = () => {
@@ -47,9 +44,6 @@ export function OceanHub({ mode, highScores, onModeChange, onZoneChange, onStart
         <button className={`ocean-action-button explore ${mode === "exploration" ? "active" : ""}`} aria-expanded={gamesOpen} aria-current={mode === "exploration" ? "page" : undefined} onClick={toggleGames}>
           <span className="ocean-action-visual"><SurfboardIcon /></span><strong>Games</strong>
         </button>
-        <button className="ocean-action-button shop" onClick={() => { setGamesOpen(false); onOpenShop(); }}>
-          <span className="ocean-action-visual"><StorefrontIcon /></span><strong>상점</strong>
-        </button>
         <button className={`ocean-action-button road ${mode === "coastal-road" ? "active" : ""}`} aria-current={mode === "coastal-road" ? "page" : undefined} onClick={() => { setGamesOpen(false); onModeChange("coastal-road"); }}>
           <span className="ocean-action-visual"><ConvertibleIcon /></span><strong>해안도로</strong>
         </button>
@@ -68,10 +62,6 @@ function JumpUpThumbnail() {
 
 function SurfboardIcon(props: SVGProps<SVGSVGElement>) {
   return <svg viewBox="0 0 72 72" aria-hidden="true" {...props}><defs><linearGradient id="surfboard-paint" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#ffe27b"/><stop offset=".52" stopColor="#ff936f"/><stop offset="1" stopColor="#42c9c2"/></linearGradient></defs><path className="icon-shadow" d="M21 61c10 5 31 2 39-5"/><path className="board" d="M17 55C15 39 25 15 38 7c5-3 10-1 11 5 3 16-8 39-20 48-5 4-11 1-12-5Z"/><path className="board-stripe" d="m21 45 24-23M20 51l25-24"/><path className="board-line" d="M35 10c-1 14-7 32-16 44"/><path className="fin" d="m30 59 7 6-10-2"/></svg>;
-}
-
-function StorefrontIcon(props: SVGProps<SVGSVGElement>) {
-  return <svg viewBox="0 0 72 72" aria-hidden="true" {...props}><path className="icon-shadow" d="M12 63h49"/><path className="store-wall" d="M15 28h42v33H15z"/><path className="store-roof" d="M11 27 18 10h36l7 17Z"/><path className="awning-light" d="M12 27h12v9c-7 4-12 0-12-5Z"/><path className="awning-dark" d="M24 27h12v9c-7 4-12 0-12-5ZM48 27h12v4c0 5-6 9-12 5Z"/><path className="store-window" d="M20 42h12v12H20z"/><path className="store-door" d="M39 39h12v22H39z"/><circle className="store-handle" cx="48" cy="50" r="1.7"/></svg>;
 }
 
 function ConvertibleIcon(props: SVGProps<SVGSVGElement>) {

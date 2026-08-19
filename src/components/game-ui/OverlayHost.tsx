@@ -15,8 +15,7 @@ const CATEGORY_LABELS: Record<ItemCategory, string> = {
   food: "음식",
   wellness: "웰니스",
   "dha-bundle": "DHA 패밀리 세트",
-  "pet-health": "반려동물 건강",
-  "ocean-gear": "탐험 장비",
+  "pet-health": "반려견 영양제",
   top: "상의",
   bottom: "하의",
   shoes: "신발",
@@ -108,7 +107,7 @@ function ShopOverlay() {
   const inventory = useGameStore((state) => state.inventory);
   const purchase = useGameStore((state) => state.purchase);
   const items = ITEM_CATALOG.filter((item) => item.category === category);
-  return <><SheetHeader eyebrow={category === "ocean-gear" ? "OCEAN RUN SUPPLY" : "ROOM SUPPLY"} title={`${roomShopTitle(room)} 아이템`} copy={category === "ocean-gear" ? "구매한 산소통과 잠수함은 이 계정에 영구 보관되고 다음 챕터를 열어 줍니다." : "이 공간에서 사용하는 게임 아이템만 표시합니다."} /><div className="shop-wallet"><span>보유 코인</span><strong>● {coins.toLocaleString()}</strong></div>{categories.length > 1 && <div className="category-tabs">{categories.map((key) => <button key={key} className={category === key ? "active" : ""} onClick={() => setCategory(key)}>{CATEGORY_LABELS[key]}</button>)}</div>}<div className="catalog-grid">{items.map((item) => { const locked = level < item.requiredLevel; const poor = coins < item.price; const ownedGear = item.category === "ocean-gear" && (inventory[item.id] ?? 0) > 0; return <article key={item.id} className={locked ? "locked" : ""}><i style={{ background: item.color }}>{item.symbol}</i><div><h3>{item.name}</h3><p>{item.description}</p><small>{inventory[item.id] ? item.category === "ocean-gear" ? "영구 장비 보유 중" : `보유 ${inventory[item.id]}개` : `Level ${item.requiredLevel}`}</small></div><button data-testid={`buy-${item.id}`} disabled={locked || poor || ownedGear} onClick={() => purchase(item.id)}>{ownedGear ? "보유 중" : locked ? `LV.${item.requiredLevel}` : `● ${item.price}`}</button></article>; })}</div></>;
+  return <><SheetHeader eyebrow="ROOM SUPPLY" title={`${roomShopTitle(room)} 아이템`} copy="이 공간에서 사용하는 게임 아이템만 표시합니다." /><div className="shop-wallet"><span>보유 코인</span><strong>● {coins.toLocaleString()}</strong></div>{categories.length > 1 && <div className="category-tabs">{categories.map((key) => <button key={key} className={category === key ? "active" : ""} onClick={() => setCategory(key)}>{CATEGORY_LABELS[key]}</button>)}</div>}<div className="catalog-grid">{items.map((item) => { const locked = level < item.requiredLevel; const poor = coins < item.price; return <article key={item.id} className={locked ? "locked" : ""}><i style={{ background: item.color }}>{item.symbol}</i><div><h3>{item.name}</h3><p>{item.description}</p><small>{inventory[item.id] ? `보유 ${inventory[item.id]}개` : `Level ${item.requiredLevel}`}</small></div><button data-testid={`buy-${item.id}`} disabled={locked || poor} onClick={() => purchase(item.id)}>{locked ? `LV.${item.requiredLevel}` : `● ${item.price}`}</button></article>; })}</div></>;
 }
 
 function PetStoreOverlay() {
@@ -120,14 +119,14 @@ function PetStoreOverlay() {
   const items = ITEM_CATALOG.filter((item) => item.category === category);
   return <>
     <header className="pet-store-header">
-      <div><p className="eyebrow">DIHA PET HEALTH STORE</p><h2 id="sheet-title">함께 건강한 하루</h2><p>반려동물용 DHA와 사람용 DHA 식품을 한 세트로, 일상 케어 제품도 한곳에서 만나보세요.</p></div>
+      <div><p className="eyebrow">DIHA DHA & DOG HEALTH</p><h2 id="sheet-title">DHA와 반려견 영양 상점</h2><p>DHA 관련 상품과 반려견 영양제만 한곳에서 만나보세요.</p></div>
       <span aria-hidden="true"><b> DHA </b><i>＋</i><b> PET </b></span>
     </header>
     <div className="pet-store-trust" aria-label="상품 구성 안내"><span>🐾 반려동물용</span><span>☺ 사람용 식품</span><span>✓ 함께 구성</span></div>
     <div className="shop-wallet"><span>보유 코인</span><strong>● {coins.toLocaleString()}</strong></div>
     <div className="category-tabs pet-store-tabs">
       <button className={category === "dha-bundle" ? "active" : ""} onClick={() => setCategory("dha-bundle")}>DHA 패밀리 세트</button>
-      <button className={category === "pet-health" ? "active" : ""} onClick={() => setCategory("pet-health")}>애견 건강기능식품</button>
+      <button className={category === "pet-health" ? "active" : ""} onClick={() => setCategory("pet-health")}>반려견 영양제</button>
     </div>
     <div className="catalog-grid pet-store-grid">{items.map((item) => {
       const locked = level < item.requiredLevel;
@@ -135,7 +134,7 @@ function PetStoreOverlay() {
       const quantity = inventory[item.id] ?? 0;
       return <article key={item.id} className={locked ? "locked" : ""}>
         <i style={{ background: item.color }}><b>{item.symbol}</b><small>{category === "dha-bundle" ? "FAMILY" : "PET CARE"}</small></i>
-        <div><span className="product-audience">{category === "dha-bundle" ? "반려동물 + 사람" : "반려동물용"}</span><h3>{item.name}</h3><p>{item.description}</p><small>{quantity ? `보유 ${quantity}개` : `Level ${item.requiredLevel}`}</small></div>
+        <div><span className="product-audience">{category === "dha-bundle" ? "반려동물 + 사람" : "반려견용"}</span><h3>{item.name}</h3><p>{item.description}</p><small>{quantity ? `보유 ${quantity}개` : `Level ${item.requiredLevel}`}</small></div>
         <button data-testid={`buy-${item.id}`} disabled={locked || poor} onClick={() => purchase(item.id)}>{locked ? `LV.${item.requiredLevel}` : `● ${item.price}`}</button>
       </article>;
     })}</div>
@@ -145,7 +144,7 @@ function PetStoreOverlay() {
 
 function shopCategories(room: RoomId): ItemCategory[] {
   if (room === "kitchen") return ["food"];
-  if (room === "wellness") return ["ocean-gear"];
+  if (room === "wellness") return ["pet-health"];
   if (room === "wardrobe") return ["top", "bottom", "shoes", "accessory"];
   if (room === "bedroom") return ["theme", "decoration"];
   if (room === "game-room") return ["accessory"];

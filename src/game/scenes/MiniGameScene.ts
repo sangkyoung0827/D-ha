@@ -59,7 +59,6 @@ export class MiniGameScene extends Phaser.Scene {
   private oceanTransitioning = false;
   private oceanInvulnerableUntil = 0;
   private oceanLastProgressAt = 0;
-  private oceanGear = { oxygenTank: false, submarine: false };
   private oceanEnvironment: Phaser.GameObjects.GameObject[] = [];
   private oceanAmbient: Phaser.GameObjects.Container[] = [];
   private oceanBackground?: Phaser.GameObjects.Image;
@@ -90,7 +89,7 @@ export class MiniGameScene extends Phaser.Scene {
     super("minigame");
   }
 
-  init(data: { id?: GameId; oceanGear?: { oxygenTank: boolean; submarine: boolean } }): void {
+  init(data: { id?: GameId }): void {
     this.gameId = data.id ?? "bubble-focus";
     this.score = 0;
     this.combo = 0;
@@ -124,7 +123,6 @@ export class MiniGameScene extends Phaser.Scene {
     this.oceanTransitioning = false;
     this.oceanInvulnerableUntil = 0;
     this.oceanLastProgressAt = 0;
-    this.oceanGear = data.oceanGear ?? { oxygenTank: false, submarine: false };
     this.oceanEnvironment = [];
     this.oceanAmbient = [];
     this.oceanBackground = undefined;
@@ -156,7 +154,7 @@ export class MiniGameScene extends Phaser.Scene {
     const darkGame = this.gameId === "current-run" || this.gameId === "ocean-run" || this.gameId === "jump-up" || this.gameId === "reef-surf" || this.gameId === "cave-sonar" || this.gameId === "deepsea-descent";
     this.cameras.main.setBackgroundColor(darkGame ? "#102d4d" : "#dff5ec");
     this.add
-      .text(20, 18, this.title(), { fontFamily: "system-ui", fontSize: "17px", fontStyle: "bold", color: darkGame ? "#e6fff8" : "#174b57", resolution: renderScale })
+      .text(58, 18, this.title(), { fontFamily: "system-ui", fontSize: "17px", fontStyle: "bold", color: darkGame ? "#e6fff8" : "#174b57", resolution: renderScale })
       .setDepth(20);
     this.scoreText = this.add
       .text(20, 50, "점수 0", { fontFamily: "system-ui", fontSize: "14px", color: darkGame ? "#bff5ec" : "#176a72", resolution: renderScale })
@@ -182,9 +180,6 @@ export class MiniGameScene extends Phaser.Scene {
 
     this.finishEvent = this.time.delayedCall(this.durationMs, () => this.finish(this.successAtTimeout()));
     this.cleanupBridge = [
-      gameBridge.on("minigame:pause", () => this.scene.pause()),
-      gameBridge.on("minigame:resume", () => this.scene.resume()),
-      gameBridge.on("minigame:restart", () => this.scene.restart({ id: this.gameId, oceanGear: this.oceanGear })),
       gameBridge.on("minigame:move", ({ direction }) => this.moveLane(direction)),
       gameBridge.on("minigame:action", () => this.performPrimaryAction()),
       gameBridge.on("minigame:debug-dha", ({ value }) => {
@@ -863,16 +858,6 @@ export class MiniGameScene extends Phaser.Scene {
     const elapsed = time - this.startedAt;
     const nextChapterIndex = Math.min(3, Math.floor(elapsed / 12_000));
     if (nextChapterIndex > this.oceanChapterIndex && !this.oceanTransitioning) {
-      if (nextChapterIndex === 2 && !this.oceanGear.oxygenTank) {
-        this.infoText?.setText("해저 동굴 체크포인트 · 상점의 산소통이 필요해요.");
-        this.finish(false);
-        return;
-      }
-      if (nextChapterIndex === 3 && !this.oceanGear.submarine) {
-        this.infoText?.setText("심해 체크포인트 · 상점의 잠수함이 필요해요.");
-        this.finish(false);
-        return;
-      }
       const next = OCEAN_RUN_CHAPTERS[nextChapterIndex];
       if (next) this.enterOceanChapter(next.id, false);
     }
@@ -1501,7 +1486,7 @@ export class MiniGameScene extends Phaser.Scene {
   }
 
   private successAtTimeout(): boolean {
-    if (this.gameId === "ocean-run") return this.oceanChapterIndex === 3 && this.oceanGear.oxygenTank && this.oceanGear.submarine;
+    if (this.gameId === "ocean-run") return this.oceanChapterIndex === 3;
     if (this.gameId === "jump-up") return this.jumpPhaseIndex === 3;
     if (this.gameId === "reef-memory" || this.gameId === "cave-sonar") return this.matchedPairs >= 4;
     if (this.gameId === "beach-football") return this.playerPoints >= 3;

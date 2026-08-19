@@ -166,8 +166,8 @@ test("하단 메뉴는 Home, Ocean, 반려동물 건강 상점으로 구성된�
   await expect(page.getByTestId("pet-store-overlay")).toBeVisible();
   await expect(page.getByText("패밀리 DHA 듀오")).toBeVisible();
   await expect(page.getByText("반려동물 + 사람", { exact: true }).first()).toBeVisible();
-  await page.getByRole("button", { name: "애견 건강기능식품" }).click();
-  await expect(page.getByText("펫 프로바이오틱 바이트")).toBeVisible();
+  await page.getByRole("button", { name: "반려견 영양제" }).click();
+  await expect(page.getByText("반려견 프로바이오틱 바이트")).toBeVisible();
   await page.getByLabel("닫기").click();
 
   await expect(page.locator(".room-studio .context-tray")).toHaveCount(0);
@@ -199,6 +199,14 @@ test("홈은 노란 방석 위 반려동물과 장소 메뉴만 보여준다", a
   await expect(page.getByTestId("home-pet-scene")).toBeVisible();
   await expect(page.getByTestId("home-pet-avatar")).toBeVisible();
   await expect(page.locator(".home-pet-cushion")).toBeVisible();
+  const seatGap = await page.evaluate(() => {
+    const paw = document.querySelector(".home-pet-avatar .pet-leg");
+    const cushion = document.querySelector(".home-pet-cushion");
+    if (!paw || !cushion) throw new Error("반려동물 발 또는 쿠션을 찾을 수 없습니다.");
+    return cushion.getBoundingClientRect().top - paw.getBoundingClientRect().bottom;
+  });
+  expect(seatGap).toBeLessThanOrEqual(4);
+  expect(seatGap).toBeGreaterThanOrEqual(-20);
   await expect(page.getByTestId("home-3d-canvas")).toHaveCount(0);
   await expect(page.getByTestId("home3d-joystick")).toHaveCount(0);
   await expect(page.getByText("거실", { exact: true })).toHaveCount(0);
@@ -261,7 +269,8 @@ test("Ocean Games는 Ocean Run과 Jump Up 두 게임만 제공한다", async ({ 
   const gamesButton = hub.getByRole("button", { name: "Games", exact: true });
   const roadButton = hub.getByRole("button", { name: "해안도로", exact: true });
   await expect(gamesButton).toBeVisible();
-  await expect(hub.getByRole("button", { name: "상점", exact: true })).toBeVisible();
+  await expect(hub.getByRole("navigation", { name: "Ocean 하단 메뉴" }).getByRole("button")).toHaveCount(2);
+  await expect(hub.getByRole("button", { name: "상점", exact: true })).toHaveCount(0);
   await expect(roadButton).toBeVisible();
   await expect(page.locator(".ocean-explore-drawer")).toHaveCount(0);
 
@@ -275,16 +284,27 @@ test("Ocean Games는 Ocean Run과 Jump Up 두 게임만 제공한다", async ({ 
   await expect(page.getByTestId("start-beach-volleyball")).toHaveCount(0);
 
   await page.getByTestId("start-ocean-run").click();
-  await expect(page.getByTestId("minigame-action")).toHaveText("점프 / 상승");
+  await expect(page.getByRole("button", { name: "게임에서 나가기" })).toBeVisible();
+  await expect(page.locator(".minigame-controls")).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "방 이동" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /일시정지|다시/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "게임에서 나가기" }).click();
+  await expect(gamesButton).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "방 이동" })).toBeVisible();
+  await gamesButton.click();
+  await page.getByTestId("start-ocean-run").click();
   await expect(page.getByTestId("minigame-live-score")).toContainText("챕터 1");
   await expect(page.getByTestId("minigame-live-score")).toContainText("DHA");
-  await page.getByRole("button", { name: "DHA 저하 테스트" }).click();
-  await expect(page.getByTestId("dha-vision-warning")).toBeVisible();
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
+  await page.getByTestId("debug-dha-low").dispatchEvent("click");
+  await expect(page.getByTestId("dha-vision-warning")).toHaveCount(1);
   await expect(page.getByTestId("minigame-live-score")).toContainText("DHA 15퍼센트");
-  await page.getByRole("button", { name: "DHA 회복 테스트" }).click();
+  await page.getByTestId("debug-dha-recover").dispatchEvent("click");
   await expect(page.getByTestId("dha-vision-warning")).toHaveCount(0);
   await expect(page.getByTestId("minigame-live-score")).toContainText("DHA 70퍼센트");
-  await page.getByRole("button", { name: "데모 완료" }).click();
+  await page.getByTestId("debug-finish-game").dispatchEvent("click");
   await expect(page.getByText("심해 탐험 완주!")).toBeVisible();
   await page.getByTestId("claim-reward").click();
 
@@ -300,64 +320,69 @@ test("Jump Up은 발판 상승과 DHA 시야 저하·회복·소진 규칙을 �
   await page.getByTestId("start-jump-up").click();
 
   const liveScore = page.getByTestId("minigame-live-score");
-  await expect(page.getByTestId("minigame-action")).toHaveText("점프 부스트");
+  await expect(page.getByRole("button", { name: "게임에서 나가기" })).toBeVisible();
+  await expect(page.locator(".minigame-controls")).toHaveCount(0);
   await expect(liveScore).toContainText("고도");
   await expect(liveScore).toContainText("DHA");
-  await page.getByRole("button", { name: "왼쪽 레인 이동" }).click();
-  await page.getByRole("button", { name: "오른쪽 레인 이동" }).click();
-  await page.getByTestId("minigame-action").click();
-  await page.getByRole("button", { name: "DHA 저하 테스트" }).click();
-  await expect(page.getByTestId("dha-vision-warning")).toBeVisible();
-  await page.getByRole("button", { name: "DHA 회복 테스트" }).click();
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
+  await page.getByTestId("debug-dha-low").dispatchEvent("click");
+  await expect(page.getByTestId("dha-vision-warning")).toHaveCount(1);
+  await page.getByTestId("debug-dha-recover").dispatchEvent("click");
   await expect(page.getByTestId("dha-vision-warning")).toHaveCount(0);
-  await page.getByRole("button", { name: "우주 단계 테스트" }).click();
+  await page.getByTestId("debug-jump-space").dispatchEvent("click");
   await expect(liveScore).toContainText("단계 4");
-  await page.getByRole("button", { name: "데모 완료" }).click();
+  await page.getByTestId("debug-finish-game").dispatchEvent("click");
   await expect(page.getByRole("heading", { name: "우주에 도착했어요!" })).toBeVisible();
   await page.getByTestId("claim-reward").click();
 
   await page.getByRole("button", { name: "Games", exact: true }).click();
   await page.getByTestId("start-jump-up").click();
-  await page.getByRole("button", { name: "DHA 소진 테스트" }).click();
+  await page.getByTestId("debug-dha-empty").dispatchEvent("click");
   await expect(page.getByRole("heading", { name: "DHA 게이지가 모두 소진됐어요" })).toBeVisible();
   await page.getByTestId("claim-reward").click();
   await expect(page.getByRole("button", { name: "Games", exact: true })).toBeVisible();
 });
 
-test("Ocean Run 조작과 챕터 장비 상점이 실제 저장 인벤토리에 연결된다", async ({ page }) => {
+test("Ocean Run 조작과 하단 DHA·반려견 영양 상점이 저장 인벤토리에 연결된다", async ({ page }) => {
   await createPet(page, "플레이어");
   await goToRoom(page, "바다");
   const gamesButton = page.getByRole("button", { name: "Games", exact: true });
 
   await gamesButton.click();
   await page.getByTestId("start-ocean-run").click();
-  const action = page.getByTestId("minigame-action");
   const liveScore = page.getByTestId("minigame-live-score");
-  await expect(action).toHaveText("점프 / 상승");
+  await expect(page.getByRole("button", { name: "게임에서 나가기" })).toBeVisible();
+  await expect(page.locator(".minigame-controls")).toHaveCount(0);
   await expect(liveScore).toContainText("챕터 1");
-  await page.getByRole("button", { name: "왼쪽 레인 이동" }).click();
-  await page.getByRole("button", { name: "오른쪽 레인 이동" }).click();
-  await action.click();
+  await page.keyboard.press("ArrowLeft");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Space");
   await expect(liveScore).toContainText("거리");
-  await page.getByRole("button", { name: "DHA 소진 테스트" }).click();
+  await page.getByTestId("debug-dha-empty").dispatchEvent("click");
   await expect(page.getByRole("heading", { name: "DHA 게이지가 모두 소진됐어요" })).toBeVisible();
   await page.getByTestId("claim-reward").click();
 
-  await page.getByRole("button", { name: "상점", exact: true }).click();
-  await expect(page.getByText("OCEAN RUN SUPPLY")).toBeVisible();
-  await expect(page.locator(".catalog-grid article")).toHaveCount(2);
-  await page.getByTestId("buy-ocean-oxygen-tank").click();
-  await page.getByTestId("buy-ocean-submarine").click();
-  await expect(page.getByTestId("buy-ocean-oxygen-tank")).toHaveText("보유 중");
-  await expect(page.getByTestId("buy-ocean-submarine")).toHaveText("보유 중");
-  await page.getByLabel("닫기").click();
+  const bottomShop = page.getByRole("navigation", { name: "방 이동" }).getByRole("button", { name: "상점 열기" });
+  await bottomShop.click();
+  await expect(page.getByRole("heading", { name: "DHA와 반려견 영양 상점" })).toBeVisible();
+  await expect(page.locator(".pet-store-tabs button")).toHaveCount(2);
+  await expect(page.locator(".pet-store-grid article")).toHaveCount(4);
+  await expect(page.getByText("딥 브레스 산소통")).toHaveCount(0);
+  await expect(page.getByText("디하 미니 잠수함")).toHaveCount(0);
+  await page.getByTestId("buy-bundle-family-dha").click();
+  await page.getByRole("button", { name: "반려견 영양제" }).click();
+  await expect(page.locator(".pet-store-grid article")).toHaveCount(5);
+  await expect(page.getByText("반려견 프로바이오틱 바이트")).toBeVisible();
+  await page.getByTestId("buy-pet-health-probiotic").click();
 
   await page.reload();
   await expect(page.getByTestId("game-shell")).toBeVisible();
-  await goToRoom(page, "바다");
-  await page.getByRole("button", { name: "상점", exact: true }).click();
-  await expect(page.getByTestId("buy-ocean-oxygen-tank")).toHaveText("보유 중");
-  await expect(page.getByTestId("buy-ocean-submarine")).toHaveText("보유 중");
+  await page.getByRole("navigation", { name: "방 이동" }).getByRole("button", { name: "상점 열기" }).click();
+  await expect(page.locator(".pet-store-grid article").filter({ hasText: "패밀리 DHA 듀오" })).toContainText("보유 1개");
+  await page.getByRole("button", { name: "반려견 영양제" }).click();
+  await expect(page.locator(".pet-store-grid article").filter({ hasText: "반려견 프로바이오틱 바이트" })).toContainText("보유 1개");
   await page.getByLabel("닫기").click();
 
   await goToRoom(page, "주방");

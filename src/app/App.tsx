@@ -13,7 +13,7 @@ import { DebugPanel } from "../components/game-ui/DebugPanel";
 import { loadMiniGameDefinition } from "../minigames/core/loadDefinition";
 import { GameRoom } from "../components/game-ui/GameRoom";
 import { OceanHub } from "../components/game-ui/OceanHub";
-import { isOceanGame, ownsOceanGear, type OceanMode, type OceanZoneId } from "../domain/ocean";
+import { isOceanGame, type OceanMode, type OceanZoneId } from "../domain/ocean";
 import { startPwaUpdate } from "../platform/pwa/update";
 import { useAccount } from "../platform/auth/AccountProvider";
 import { GoogleSignInScreen } from "../components/auth/GoogleSignInScreen";
@@ -39,7 +39,6 @@ export function App() {
   const toast = useGameStore((state) => state.toast);
   const overlay = useGameStore((state) => state.overlay);
   const highScores = useGameStore((state) => state.highScores);
-  const inventory = useGameStore((state) => state.inventory);
   const recoveryMessage = useGameStore((state) => state.recoveryMessage);
   const recoveryBackup = useGameStore((state) => state.recoveryBackup);
   const setRoom = useGameStore((state) => state.setRoom);
@@ -126,7 +125,7 @@ export function App() {
   return (
     <div className={`app-background theme-${roomTheme} ${settings.reducedMotion ? "reduced-motion" : ""}`}>
       <div className="wide-ocean" aria-hidden="true"><i /><i /><i /></div>
-      <main className="game-shell" data-testid="game-shell">
+      <main className={`game-shell${activeMiniGame ? " is-playing" : ""}`} data-testid="game-shell">
         <StatusBar needs={needs} />
         <GameRoom room={currentRoom} petName={profile.name} immersive={Boolean(activeMiniGame)}>
           {!activeMiniGame && currentRoom === "studio"
@@ -137,12 +136,12 @@ export function App() {
                   setBathProgress(0);
                   setRoom(room);
                 }} /></Suspense>
-            : <GameCanvas room={currentRoom} theme={roomTheme} equipped={equipped} appearance={profile} reducedMotion={settings.reducedMotion} oceanMode={oceanMode} oceanZone={oceanZone} oceanGear={ownsOceanGear(inventory)} activeMiniGame={activeMiniGame} onMiniGameFinish={handleMiniGameFinish} onBathComplete={handleBathComplete} onBathProgress={handleBathProgress} />}
+            : <GameCanvas room={currentRoom} theme={roomTheme} equipped={equipped} appearance={profile} reducedMotion={settings.reducedMotion} oceanMode={oceanMode} oceanZone={oceanZone} activeMiniGame={activeMiniGame} onMiniGameFinish={handleMiniGameFinish} onBathComplete={handleBathComplete} onBathProgress={handleBathProgress} />}
           {!activeMiniGame && currentRoom !== "studio" && currentRoom !== "wellness" && <ContextTray room={currentRoom} bathProgress={bathProgress} />}
-          {!activeMiniGame && currentRoom === "wellness" && <OceanHub mode={oceanMode} zone={oceanZone} highScores={highScores} oceanGear={ownsOceanGear(inventory)} onModeChange={setOceanMode} onZoneChange={setOceanZone} onStartGame={(id) => void startGame(id)} onOpenShop={() => setOverlay("shop")} />}
+          {!activeMiniGame && currentRoom === "wellness" && <OceanHub mode={oceanMode} highScores={highScores} onModeChange={setOceanMode} onZoneChange={setOceanZone} onStartGame={(id) => void startGame(id)} />}
           {activeMiniGame && <MiniGameOverlay id={activeMiniGame} result={pendingResult} debug={debug} onClaim={claimReward} onExit={() => { const returnRoom = isOceanGame(activeMiniGame) ? "wellness" : "game-room"; setPendingResult(null); setActiveMiniGame(null); setRoom(returnRoom); }} />}
         </GameRoom>
-        <RoomNav current={currentRoom} shopActive={overlay === "pet-store"} onChange={changeRoom} onOpenShop={() => setOverlay("pet-store")} />
+        {!activeMiniGame && <RoomNav current={currentRoom} shopActive={overlay === "pet-store"} onChange={changeRoom} onOpenShop={() => setOverlay("pet-store")} />}
       </main>
       <OverlayHost />
       {debug && <DebugPanel />}

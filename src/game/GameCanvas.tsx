@@ -16,7 +16,6 @@ interface GameCanvasProps {
   reducedMotion: boolean;
   oceanMode: OceanMode;
   oceanZone: OceanZoneId;
-  oceanGear: { oxygenTank: boolean; submarine: boolean };
   activeMiniGame: MiniGameResult["gameId"] | null;
   onMiniGameFinish(result: MiniGameResult): void;
   onBathComplete(): void;
@@ -26,8 +25,6 @@ interface GameCanvasProps {
 export function GameCanvas(props: GameCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
-  const oxygenTank = props.oceanGear.oxygenTank;
-  const submarine = props.oceanGear.submarine;
   const presentationRef = useRef({
     room: props.room,
     theme: props.theme,
@@ -120,12 +117,12 @@ export function GameCanvas(props: GameCanvasProps) {
       if (cancelled || !gameRef.current) return;
       if (!game.scene.keys.minigame) game.scene.add("minigame", MiniGameScene, false);
       if (game.scene.isActive("room")) game.scene.sleep("room");
-      game.scene.start("minigame", { id: props.activeMiniGame, oceanGear: { oxygenTank, submarine } });
+      game.scene.start("minigame", { id: props.activeMiniGame });
     });
     return () => {
       cancelled = true;
     };
-  }, [props.activeMiniGame, oxygenTank, submarine]);
+  }, [props.activeMiniGame]);
 
   return <div ref={hostRef} className="phaser-host" aria-label={`디하 반려동물 게임 화면: ${petDescription(props.appearance)}`} />;
 }

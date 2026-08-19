@@ -31,7 +31,6 @@ export interface OceanRunChapter {
   title: string;
   mode: string;
   hazards: string;
-  requiredItemId: "ocean-oxygen-tank" | "ocean-submarine" | null;
 }
 
 export const OCEAN_RUN_GAME: OceanGameInfo = {
@@ -57,10 +56,10 @@ export const JUMP_UP_GAME: OceanGameInfo = {
 };
 
 export const OCEAN_RUN_CHAPTERS: OceanRunChapter[] = [
-  { id: "beach", number: "01", title: "해변", mode: "보드를 들고 달리기", hazards: "야자수", requiredItemId: null },
-  { id: "surf", number: "02", title: "파도", mode: "서핑보드 라이딩", hazards: "상어 · 해파리", requiredItemId: null },
-  { id: "cave", number: "03", title: "해저 동굴", mode: "산소통 다이빙", hazards: "종유석 · 해류 분출 · 암초", requiredItemId: "ocean-oxygen-tank" },
-  { id: "deepsea", number: "04", title: "심해", mode: "잠수함 탐험", hazards: "해파리 · 기뢰 · 심해 암벽", requiredItemId: "ocean-submarine" }
+  { id: "beach", number: "01", title: "해변", mode: "보드를 들고 달리기", hazards: "야자수" },
+  { id: "surf", number: "02", title: "파도", mode: "서핑보드 라이딩", hazards: "상어 · 해파리" },
+  { id: "cave", number: "03", title: "해저 동굴", mode: "산소통 다이빙", hazards: "종유석 · 해류 분출 · 암초" },
+  { id: "deepsea", number: "04", title: "심해", mode: "잠수함 탐험", hazards: "해파리 · 기뢰 · 심해 암벽" }
 ];
 
 export const OCEAN_ZONES: OceanZoneInfo[] = [
@@ -105,11 +104,4 @@ export function oceanCompletionCopy(result: MiniGameResult): string | null {
   if (result.gameId === "ocean-run") return result.success ? "해변부터 심해까지 Ocean Run 완주!" : "Ocean Run 탐험 기록을 저장했어요.";
   if (result.gameId === "jump-up") return result.success ? "Jump Up으로 우주에 도착했어요!" : "Jump Up 최고 고도를 저장했어요.";
   return null;
-}
-
-export function ownsOceanGear(inventory: Record<string, number>) {
-  return {
-    oxygenTank: (inventory["ocean-oxygen-tank"] ?? 0) > 0,
-    submarine: (inventory["ocean-submarine"] ?? 0) > 0
-  };
 }

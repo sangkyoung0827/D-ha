@@ -21,14 +21,11 @@ export const ITEM_CATALOG: ItemDefinition[] = [
   { id: "bundle-senior-balance", category: "dha-bundle", name: "시니어 밸런스 세트", description: "노령 반려동물용 DHA 케어와 사람용 데일리 DHA 식품 구성", price: 320, requiredLevel: 4, effects: { energy: 20, joy: 10 }, color: "#8b78b5", symbol: "D+" },
   { id: "bundle-cat-dha", category: "dha-bundle", name: "캣 앤 패밀리 DHA", description: "고양이용 피쉬 DHA 바이트와 사람용 조류 DHA 젤리 구성", price: 280, requiredLevel: 3, effects: { energy: 18, joy: 12 }, color: "#df8d64", symbol: "CAT" },
 
-  { id: "pet-health-probiotic", category: "pet-health", name: "펫 프로바이오틱 바이트", description: "게임 속 장 건강 루틴을 위한 데일리 바이트", price: 95, requiredLevel: 1, effects: { energy: 7, joy: 4 }, color: "#62a86f", symbol: "BIO" },
-  { id: "pet-health-joint", category: "pet-health", name: "조인트 오메가 츄", description: "활동적인 반려동물의 관절 케어 루틴 아이템", price: 125, requiredLevel: 2, effects: { energy: 11 }, color: "#e1a548", symbol: "JOINT" },
-  { id: "pet-health-coat", category: "pet-health", name: "스킨 앤 코트 밸런스", description: "피부와 모질 관리 루틴을 위한 게임 아이템", price: 140, requiredLevel: 3, effects: { joy: 13 }, color: "#d77889", symbol: "COAT" },
-  { id: "pet-health-eye", category: "pet-health", name: "브라이트 아이 케어", description: "눈 건강 관리 습관을 기록하는 데일리 케어 아이템", price: 155, requiredLevel: 4, effects: { joy: 9, energy: 7 }, color: "#597fb3", symbol: "EYE" },
-  { id: "pet-health-senior", category: "pet-health", name: "시니어 데일리 팩", description: "노령 반려동물의 균형 잡힌 케어 루틴 패키지", price: 210, requiredLevel: 6, effects: { energy: 18, joy: 8 }, color: "#7f779b", symbol: "AGE+" },
-
-  { id: "ocean-oxygen-tank", category: "ocean-gear", name: "딥 브레스 산소통", description: "해저 동굴 챕터 진입에 필요한 영구 탐험 장비", price: 160, requiredLevel: 1, color: "#35b9b0", symbol: "O₂" },
-  { id: "ocean-submarine", category: "ocean-gear", name: "디하 미니 잠수함", description: "심해 챕터 진입에 필요한 영구 탐험 장비", price: 280, requiredLevel: 1, color: "#efb84f", symbol: "◉" },
+  { id: "pet-health-probiotic", category: "pet-health", name: "반려견 프로바이오틱 바이트", description: "반려견의 장 건강 루틴을 위한 데일리 영양 바이트", price: 95, requiredLevel: 1, effects: { energy: 7, joy: 4 }, color: "#62a86f", symbol: "BIO" },
+  { id: "pet-health-joint", category: "pet-health", name: "반려견 조인트 오메가 츄", description: "활동적인 반려견의 관절 케어를 위한 영양 츄", price: 125, requiredLevel: 2, effects: { energy: 11 }, color: "#e1a548", symbol: "JOINT" },
+  { id: "pet-health-coat", category: "pet-health", name: "반려견 스킨 앤 코트 밸런스", description: "반려견의 피부와 모질 관리를 위한 영양제", price: 140, requiredLevel: 3, effects: { joy: 13 }, color: "#d77889", symbol: "COAT" },
+  { id: "pet-health-eye", category: "pet-health", name: "반려견 브라이트 아이 케어", description: "반려견의 눈 건강 관리 습관을 위한 데일리 케어", price: 155, requiredLevel: 4, effects: { joy: 9, energy: 7 }, color: "#597fb3", symbol: "EYE" },
+  { id: "pet-health-senior", category: "pet-health", name: "반려견 시니어 데일리 팩", description: "노령 반려견의 균형 잡힌 영양 케어 패키지", price: 210, requiredLevel: 6, effects: { energy: 18, joy: 8 }, color: "#7f779b", symbol: "AGE+" },
 
   { id: "top-rookie", category: "top", name: "화이트 반팔 티셔츠", description: "디하의 산뜻한 기본 반팔", price: 0, requiredLevel: 1, wearableSlot: "top", color: "#f7f7f2", symbol: "▱" },
   { id: "top-coast", category: "top", name: "코스트 셔츠", description: "바람이 통하는 셔츠", price: 140, requiredLevel: 2, wearableSlot: "top", color: "#65c7c1", symbol: "▱" },

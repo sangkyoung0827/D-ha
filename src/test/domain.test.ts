@@ -17,7 +17,7 @@ import {
 } from "../domain/economy";
 import { levelFromXp } from "../domain/progression";
 import { migrateSave, parseImportedSave } from "../store/migrations";
-import { OCEAN_GAME_BY_ID, OCEAN_RUN_CHAPTERS, isOceanGame, oceanGameNeedEffects, ownsOceanGear } from "../domain/ocean";
+import { OCEAN_GAME_BY_ID, OCEAN_RUN_CHAPTERS, isOceanGame, oceanGameNeedEffects } from "../domain/ocean";
 import { FUR_COLORS, PET_ACCESSORIES, PET_ANIMATIONS, PET_BREEDS, PET_COLLARS, PET_HATS, PET_OUTFITS, PET_PATTERNS } from "../domain/pet";
 import { ITEM_BY_ID } from "../domain/catalog";
 import { newestAccountSave } from "../store/accountSave";
@@ -100,8 +100,6 @@ describe("바다 생태계 진행", () => {
   });
 
   it("산소통과 잠수함은 계정 인벤토리 소유 여부로 각 챕터를 연다", () => {
-    expect(ownsOceanGear({})).toEqual({ oxygenTank: false, submarine: false });
-    expect(ownsOceanGear({ "ocean-oxygen-tank": 1, "ocean-submarine": 1 })).toEqual({ oxygenTank: true, submarine: true });
     const result = { gameId: "ocean-run" as const, score: 500, success: true, durationMs: 48_000 };
     expect(isOceanGame(result.gameId)).toBe(true);
     expect(oceanGameNeedEffects(result)).toEqual({ joy: 16, energy: -7 });

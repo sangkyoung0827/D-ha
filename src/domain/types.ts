@@ -25,7 +25,6 @@ export type ItemCategory =
   | "wellness"
   | "dha-bundle"
   | "pet-health"
-  | "ocean-gear"
   | "top"
   | "bottom"
   | "shoes"

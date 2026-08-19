@@ -14,9 +14,6 @@ export interface BridgeEvents {
   "home:door-enter": { room: RoomId };
   "minigame:start": { id: MiniGameResult["gameId"] };
   "minigame:finish": MiniGameResult;
-  "minigame:pause": undefined;
-  "minigame:resume": undefined;
-  "minigame:restart": undefined;
   "minigame:move": { direction: -1 | 1 };
   "minigame:action": undefined;
   "minigame:progress": { gameId: MiniGameResult["gameId"]; score: number; playerPoints: number; computerPoints: number; dha?: number };
