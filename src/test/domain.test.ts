@@ -23,6 +23,7 @@ import { ITEM_BY_ID } from "../domain/catalog";
 import { newestAccountSave } from "../store/accountSave";
 import { persistenceKeyForOwner } from "../store/persistence";
 import { isHomeInterior, topLevelRoom } from "../domain/home";
+import { calculateSupplementAssessment } from "../domain/supplementRecommendation";
 
 const start = new Date("2026-08-01T00:00:00.000Z");
 
@@ -160,7 +161,7 @@ describe("진행 데이터", () => {
     expect(refreshed.goals.every((goal) => goal.progress === 0 && !goal.completed)).toBe(true);
   });
 
-  it("기존 사람 외형 저장을 진행 상태를 보존한 반려동물 v5 저장으로 마이그레이션한다", () => {
+  it("기존 사람 외형 저장을 진행 상태를 보존한 반려동물 v6 저장으로 마이그레이션한다", () => {
     const current = createDefaultSave(start);
     const legacyProfile = {
       name: current.profile.name,
@@ -173,10 +174,33 @@ describe("진행 데이터", () => {
     const result = migrateSave(legacy, start);
 
     expect(result.status).toBe("migrated");
-    expect(result.save.version).toBe(5);
+    expect(result.save.version).toBe(6);
     expect(result.save.profile.name).toBe(current.profile.name);
     expect(result.save.profile.breed).toBe("maltese");
     expect(result.save.coins).toBe(777);
+    expect(result.save.petMedical.records).toEqual([]);
+    expect(result.save.petMemories).toEqual([]);
+    expect(result.save.petExplorations).toEqual([]);
+  });
+
+  it("반려동물 v5 저장은 선택한 품종과 외형을 유지하며 건강·추억·탐험 저장을 추가한다", () => {
+    const current = createDefaultSave(start);
+    const previous = {
+      ...current,
+      version: 5,
+      profile: { ...current.profile, species: "cat", breed: "siamese", furColor: "seal", pattern: "points" }
+    } as Record<string, unknown>;
+    delete previous.petMedical;
+    delete previous.petMemories;
+    delete previous.petExplorations;
+    const result = migrateSave(previous, start);
+
+    expect(result.status).toBe("migrated");
+    expect(result.save.profile.breed).toBe("siamese");
+    expect(result.save.profile.pattern).toBe("points");
+    expect(result.save.petMedical.bloodType).toBe("미확인");
+    expect(result.save.petMemories).toEqual([]);
+    expect(result.save.petExplorations).toEqual([]);
   });
 
   it("손상 저장 데이터는 백업과 안전한 새 저장을 제공한다", () => {
@@ -186,7 +210,7 @@ describe("진행 데이터", () => {
     expect(malformed.status).toBe("corrupt");
     expect(malformed.backup).toBe("{not-json");
     expect(invalid.status).toBe("corrupt");
-    expect(invalid.save.version).toBe(5);
+    expect(invalid.save.version).toBe(6);
     expect(invalid.save.coins).toBeGreaterThanOrEqual(0);
   });
 });
@@ -208,5 +232,52 @@ describe("계정별 저장", () => {
     );
 
     expect(selected?.save.coins).toBe(940);
+  });
+});
+
+describe("반려동물 영양제 스크리닝", () => {
+  it("성장기에는 실제 섭취 열량과 FEDIAF EPA+DHA 기준으로 보완 참고값을 계산한다", () => {
+    const result = calculateSupplementAssessment({
+      species: "dog",
+      weightKg: 5,
+      lifeStage: "growth",
+      activity: "normal",
+      bodyCondition: 5,
+      goal: "daily",
+      dailyCalories: 500,
+      currentEpaDhaMg: 20,
+      productEpaMg: 20,
+      productDhaMg: 25,
+      labelMaxServings: 1,
+      risks: []
+    });
+
+    expect(result.status).toBe("planning-reference");
+    expect(result.referenceEpaDhaMg).toBe(65);
+    expect(result.calculatedGapMg).toBe(45);
+    expect(result.calculatedServings).toBe(1);
+    expect(result.requiresVeterinarian).toBe(false);
+  });
+
+  it("성체는 근거가 부족한 정량을 만들지 않고 위험요인이 있으면 수의사 검토로 전환한다", () => {
+    const result = calculateSupplementAssessment({
+      species: "cat",
+      weightKg: 4.2,
+      lifeStage: "adult",
+      activity: "low",
+      bodyCondition: 6,
+      goal: "cognition",
+      currentEpaDhaMg: 40,
+      productEpaMg: 30,
+      productDhaMg: 20,
+      labelMaxServings: 1,
+      risks: ["medication"]
+    });
+
+    expect(result.status).toBe("review-required");
+    expect(result.referenceEpaDhaMg).toBeNull();
+    expect(result.calculatedGapMg).toBeNull();
+    expect(result.calculatedServings).toBeNull();
+    expect(result.requiresVeterinarian).toBe(true);
   });
 });

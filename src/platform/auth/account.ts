@@ -16,4 +16,5 @@ export interface AccountAdapter {
   subscribe(listener: (snapshot: AccountSnapshot) => void): () => void;
   signInWithGoogle(): Promise<GameAccount | null>;
   signOut(): Promise<void>;
+  getIdToken(): Promise<string | null>;
 }

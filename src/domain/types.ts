@@ -89,6 +89,51 @@ export interface GameNotification {
   createdAt: string;
 }
 
+export interface HospitalConnection {
+  hospitalName: string;
+  patientNumber: string;
+  status: "not-connected" | "pending" | "connected";
+  lastSyncedAt: string | null;
+}
+
+export interface PetMedicalRecord {
+  id: string;
+  visitDate: string;
+  hospitalName: string;
+  diagnosis: string;
+  treatment: string;
+  note: string;
+  nextVisitDate: string | null;
+  source: "manual" | "hospital";
+  createdAt: string;
+}
+
+export interface PetMedicalProfile {
+  bloodType: string;
+  microchipId: string;
+  hospital: HospitalConnection;
+  records: PetMedicalRecord[];
+}
+
+export interface PetMemory {
+  id: string;
+  title: string;
+  memoryDate: string;
+  note: string;
+  photoDataUrl: string;
+  createdAt: string;
+}
+
+export interface PetExploration {
+  id: string;
+  placeName: string;
+  visitDate: string;
+  note: string;
+  latitude: number;
+  longitude: number;
+  createdAt: string;
+}
+
 export interface GameReward {
   coins: number;
   xp: number;
@@ -117,7 +162,7 @@ export interface MiniGameResult {
 }
 
 export interface GameSave {
-  version: 5;
+  version: 6;
   profile: PetProfile;
   tutorialComplete: boolean;
   needs: NeedValues;
@@ -140,6 +185,9 @@ export interface GameSave {
   stats: GameStats;
   greetedFriends: Record<string, string>;
   notifications: GameNotification[];
+  petMedical: PetMedicalProfile;
+  petMemories: PetMemory[];
+  petExplorations: PetExploration[];
 }
 
 export interface MiniGameDefinition {

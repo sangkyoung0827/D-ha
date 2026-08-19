@@ -14,6 +14,10 @@ import type {
   GameSettings,
   MiniGameResult,
   NeedValues,
+  PetExploration,
+  PetMedicalProfile,
+  PetMedicalRecord,
+  PetMemory,
   RoomId,
   WearableSlot
 } from "../domain/types";
@@ -22,7 +26,7 @@ import { clearGame, loadGame, saveGame } from "./persistence";
 import { parseImportedSave } from "./migrations";
 import { newestAccountSave } from "./accountSave";
 
-export type OverlayId = "none" | "fridge" | "inventory" | "shop" | "pet-store" | "wardrobe" | "achievements" | "friends" | "settings" | "daily" | "notifications";
+export type OverlayId = "none" | "fridge" | "inventory" | "shop" | "pet-store" | "wardrobe" | "achievements" | "friends" | "settings" | "daily" | "notifications" | "pet-hospital" | "pet-diary" | "pet-exploration" | "pet-supplement";
 
 interface GameRuntime {
   hydrated: boolean;
@@ -52,6 +56,13 @@ interface GameActions {
   greetFriend(friendId: string): void;
   updateSettings(settings: Partial<GameSettings>): void;
   dismissNotification(id: string): void;
+  savePetMedicalProfile(profile: PetMedicalProfile): void;
+  addPetMedicalRecord(record: Omit<PetMedicalRecord, "id" | "createdAt" | "source">): void;
+  removePetMedicalRecord(id: string): void;
+  addPetMemory(memory: Omit<PetMemory, "id" | "createdAt">): void;
+  removePetMemory(id: string): void;
+  addPetExploration(exploration: Omit<PetExploration, "id" | "createdAt">): void;
+  removePetExploration(id: string): void;
   clearToast(): void;
   exportData(): string;
   importData(raw: string): boolean;
@@ -83,7 +94,7 @@ function addNotification(save: GameSave, notification: Omit<GameNotification, "i
 
 function saveFromStore(state: GameStore): GameSave {
   return {
-    version: 5,
+    version: 6,
     profile: state.profile,
     tutorialComplete: state.tutorialComplete,
     needs: state.needs,
@@ -105,7 +116,10 @@ function saveFromStore(state: GameStore): GameSave {
     lastLoginDate: state.lastLoginDate,
     stats: state.stats,
     greetedFriends: state.greetedFriends,
-    notifications: state.notifications
+    notifications: state.notifications,
+    petMedical: state.petMedical,
+    petMemories: state.petMemories,
+    petExplorations: state.petExplorations
   };
 }
 
@@ -460,6 +474,43 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     dismissNotification(id) {
       commit((save) => ({ ...save, notifications: save.notifications.filter((notification) => notification.id !== id) }));
+    },
+
+    savePetMedicalProfile(profile) {
+      commit((save) => ({ ...save, petMedical: profile }), "건강 정보와 병원 연결 정보를 저장했어요.");
+    },
+
+    addPetMedicalRecord(record) {
+      const now = new Date();
+      commit((save) => ({
+        ...save,
+        petMedical: {
+          ...save.petMedical,
+          records: [{ ...record, id: `record-${now.getTime()}`, source: "manual" as const, createdAt: now.toISOString() }, ...save.petMedical.records].slice(0, 80)
+        }
+      }), "진료기록을 저장했어요.");
+    },
+
+    removePetMedicalRecord(id) {
+      commit((save) => ({ ...save, petMedical: { ...save.petMedical, records: save.petMedical.records.filter((record) => record.id !== id) } }), "진료기록을 삭제했어요.");
+    },
+
+    addPetMemory(memory) {
+      const now = new Date();
+      commit((save) => ({ ...save, petMemories: [{ ...memory, id: `memory-${now.getTime()}`, createdAt: now.toISOString() }, ...save.petMemories].slice(0, 24) }), "소중한 추억을 펫 일기에 저장했어요.");
+    },
+
+    removePetMemory(id) {
+      commit((save) => ({ ...save, petMemories: save.petMemories.filter((memory) => memory.id !== id) }), "펫 일기 기록을 삭제했어요.");
+    },
+
+    addPetExploration(exploration) {
+      const now = new Date();
+      commit((save) => ({ ...save, petExplorations: [{ ...exploration, id: `place-${now.getTime()}`, createdAt: now.toISOString() }, ...save.petExplorations].slice(0, 80) }), "함께한 장소를 지도에 저장했어요.");
+    },
+
+    removePetExploration(id) {
+      commit((save) => ({ ...save, petExplorations: save.petExplorations.filter((exploration) => exploration.id !== id) }), "탐험 장소를 삭제했어요.");
     },
 
     clearToast() {

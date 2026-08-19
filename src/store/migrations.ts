@@ -23,7 +23,7 @@ const petProfileSchema = z.object({
 });
 
 export const gameSaveSchema: z.ZodType<GameSave> = z.object({
-  version: z.literal(5),
+  version: z.literal(6),
   profile: petProfileSchema,
   tutorialComplete: z.boolean(),
   needs: needsSchema,
@@ -83,7 +83,45 @@ export const gameSaveSchema: z.ZodType<GameSave> = z.object({
       kind: z.enum(["care", "achievement", "level", "purchase", "daily", "return", "system"]),
       createdAt: z.iso.datetime()
     })
-  )
+  ),
+  petMedical: z.object({
+    bloodType: z.string().trim().max(30),
+    microchipId: z.string().trim().max(40),
+    hospital: z.object({
+      hospitalName: z.string().trim().max(80),
+      patientNumber: z.string().trim().max(50),
+      status: z.enum(["not-connected", "pending", "connected"]),
+      lastSyncedAt: z.iso.datetime().nullable()
+    }),
+    records: z.array(z.object({
+      id: z.string(),
+      visitDate: z.string().max(10),
+      hospitalName: z.string().trim().max(80),
+      diagnosis: z.string().trim().max(120),
+      treatment: z.string().trim().max(300),
+      note: z.string().trim().max(500),
+      nextVisitDate: z.string().max(10).nullable(),
+      source: z.enum(["manual", "hospital"]),
+      createdAt: z.iso.datetime()
+    })).max(80)
+  }),
+  petMemories: z.array(z.object({
+    id: z.string(),
+    title: z.string().trim().min(1).max(60),
+    memoryDate: z.string().max(10),
+    note: z.string().trim().max(500),
+    photoDataUrl: z.string().startsWith("data:image/").max(350_000),
+    createdAt: z.iso.datetime()
+  })).max(24),
+  petExplorations: z.array(z.object({
+    id: z.string(),
+    placeName: z.string().trim().min(1).max(80),
+    visitDate: z.string().max(10),
+    note: z.string().trim().max(500),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    createdAt: z.iso.datetime()
+  })).max(80)
 });
 
 export interface RecoveryResult {
@@ -100,7 +138,7 @@ export function migrateSave(input: unknown, now = new Date()): RecoveryResult {
   if (input && typeof input === "object") {
     const legacy = input as Record<string, unknown>;
     const version = Number(legacy.version ?? 1);
-    if (version >= 1 && version <= 4) {
+    if (version >= 1 && version <= 5) {
       const base = createDefaultSave(now);
       const legacyProfile = legacy.profile && typeof legacy.profile === "object" ? legacy.profile as Record<string, unknown> : {};
       const legacyName = typeof legacyProfile.name === "string" && legacyProfile.name.trim()
@@ -109,11 +147,10 @@ export function migrateSave(input: unknown, now = new Date()): RecoveryResult {
       const merged: GameSave = {
         ...base,
         ...(legacy as Partial<GameSave>),
-        version: 5,
-        profile: {
-          ...base.profile,
-          name: legacyName
-        },
+        version: 6,
+        profile: version === 5
+          ? { ...base.profile, ...(legacyProfile as Partial<GameSave["profile"]>), name: legacyName }
+          : { ...base.profile, name: legacyName },
         settings: { ...base.settings, ...((legacy.settings as Partial<GameSave["settings"]>) ?? {}) },
         stats: { ...base.stats, ...((legacy.stats as Partial<GameSave["stats"]>) ?? {}) },
         lastSavedAt: typeof legacy.lastSavedAt === "string" ? legacy.lastSavedAt : now.toISOString()

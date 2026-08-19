@@ -98,7 +98,7 @@ export function Onboarding() {
       <h1>함께 살고, 돌보고,<br />매일 새로운 곳을 만나요.</h1>
       <ul className="tour-list">
         <li><b>01</b><span><strong>우리 집</strong>자기 집에서 쉬고 조이스틱으로 집 안을 자유롭게 걸어요.</span></li>
-        <li><b>02</b><span><strong>반려동물 장소</strong>동물병원, 애견 카페, 산책로, 미용실과 펫샵을 만나보세요.</span></li>
+        <li><b>02</b><span><strong>반려동물 장소</strong>동물병원, 펫 일기, 펫의 탐험, 미용실과 AI 영양제 추천을 만나보세요.</span></li>
         <li><b>03</b><span><strong>나만의 모습</strong>품종 고유 체형을 유지하면서 털, 무늬와 액세서리를 바꿔요.</span></li>
       </ul>
       <button className="primary-button wide" onClick={finishTutorial}>Home 입장 · 보상 받기</button>

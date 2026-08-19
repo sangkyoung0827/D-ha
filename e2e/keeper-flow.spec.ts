@@ -92,7 +92,8 @@ test("반려동물 생성부터 돌봄, 미니게임, 구매, 장착과 새로�
   await goToRoom(page, "바다");
   await page.getByRole("button", { name: "Games", exact: true }).click();
   await page.getByTestId("start-ocean-run").click();
-  await page.getByRole("button", { name: "데모 완료" }).click();
+  await expect(page.getByTestId("minigame-live-score")).toContainText("챕터 1");
+  await page.getByTestId("debug-finish-game").dispatchEvent("click");
   await expect(page.getByTestId("claim-reward")).toBeVisible();
   await page.getByTestId("claim-reward").click();
 
@@ -177,9 +178,8 @@ test("하단 메뉴는 Home, Ocean, 반려동물 건강 상점으로 구성된�
   const petPlaces = page.getByRole("navigation", { name: "반려동물 장소" });
   await expect(petPlaces.getByRole("button")).toHaveCount(5);
   await expect(petPlaces.getByRole("button", { name: /동물병원/ })).toBeVisible();
-  await expect(petPlaces.getByRole("button", { name: /애견 카페/ })).toBeVisible();
-  await petPlaces.getByRole("button", { name: /산책로/ }).click();
-  await expect(petPlaces.getByRole("button", { name: /산책로/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(petPlaces.getByRole("button", { name: /펫 일기/ })).toBeVisible();
+  await expect(petPlaces.getByRole("button", { name: /펫의 탐험/ })).toBeVisible();
   const rooms = [
     ["주방", "Kitchen"],
     ["욕실", "Bath Items"],
@@ -215,6 +215,137 @@ test("홈은 노란 방석 위 반려동물과 장소 메뉴만 보여준다", a
   await page.getByRole("navigation", { name: "방 이동" }).getByRole("button", { name: /바다/ }).click();
   await expect(page.locator(".room-wellness .room-heading h1")).toHaveText("Ocean");
   await expect(page.getByRole("button", { name: "Games", exact: true })).toBeVisible();
+});
+
+test("홈 하단 헤더 펫 연구원은 로그인 토큰으로 질문하고 논문 출처를 표시한다", async ({ page }) => {
+  let authorization = "";
+  await page.route("**/api/pet-research", async (route) => {
+    authorization = route.request().headers().authorization || "";
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        answer: "반려견의 영양 상태는 개별 건강 상태와 식단을 함께 살펴야 합니다 [1].\n\n참고: 이 답변은 수의사의 진료를 대신하지 않습니다.",
+        sources: [{
+          id: "openalex:test",
+          provider: "OpenAlex",
+          title: "Companion animal nutrition review",
+          url: "https://example.org/pet-study",
+          year: 2025
+        }]
+      })
+    });
+  });
+  await createPet(page, "연구견");
+  const researcher = page.getByRole("region", { name: "헤더 펫 연구원" });
+  await expect(researcher).toBeVisible();
+  await researcher.getByLabel("펫 연구원에게 질문").fill("우리 강아지의 식단은 어떻게 확인해야 해?");
+  await researcher.getByRole("button", { name: "질문 보내기" }).click();
+  await expect(researcher.getByText(/영양 상태는 개별 건강 상태/)).toBeVisible();
+  await expect(researcher.getByRole("link", { name: /Companion animal nutrition review/ })).toHaveAttribute("href", "https://example.org/pet-study");
+  expect(authorization).toBe("Bearer e2e-google-user");
+});
+
+test("홈의 반려동물 영양제 추천은 규칙 계산과 AI 근거 설명을 함께 표시한다", async ({ page }) => {
+  let requestBody: Record<string, unknown> = {};
+  await page.route("**/api/pet-research", async (route) => {
+    requestBody = route.request().postDataJSON() as Record<string, unknown>;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        answer: "성장기 완전사료 영양 기준과 현재 섭취량의 차이를 계산한 참고값입니다 [1]. 제품 표시사항을 먼저 확인하세요 [2]. 질병 치료·예방 표현으로 사용하지 않습니다 [3]. 수의사 확인 전에는 실제 급여량을 확정하지 마세요.",
+        assessment: {
+          status: "planning-reference",
+          caloriesPerDay: 500,
+          caloriesSource: "entered",
+          referenceEpaDhaMg: 65,
+          currentEpaDhaMg: 20,
+          calculatedGapMg: 45,
+          productEpaDhaMg: 45,
+          calculatedServings: 1,
+          requiresVeterinarian: false,
+          flags: ["이 값은 치료용 처방량이 아닙니다."]
+        },
+        sources: [{ id: "fediaf", citation: 1, provider: "FEDIAF", title: "Nutritional Guidelines 2025", url: "https://example.org/fediaf", year: 2025 }]
+      })
+    });
+  });
+
+  await createPet(page, "영양이");
+  const places = page.getByRole("navigation", { name: "반려동물 장소" });
+  const recommendationButton = places.getByRole("button", { name: /반려동물 영양제 추천/ });
+  await expect(recommendationButton).toBeVisible();
+  await expect(places.getByRole("button", { name: /펫샵/ })).toHaveCount(0);
+  await recommendationButton.click();
+  await expect(page.getByTestId("pet-supplement-overlay")).toBeVisible();
+  await page.getByLabel("현재 체중 (kg)").fill("5");
+  await page.getByLabel("연령 단계").selectOption("growth");
+  await page.getByLabel(/실제 일일 섭취 kcal/).fill("500");
+  await page.getByLabel(/현재 사료·영양제 EPA\+DHA 합계/).fill("20");
+  await page.getByLabel("제품 1회분 EPA (mg)").fill("20");
+  await page.getByLabel("제품 1회분 DHA (mg)").fill("25");
+  await page.getByRole("button", { name: "맞춤 영양 분석하기" }).click();
+  await expect(page.getByTestId("supplement-result")).toContainText("45 mg");
+  await expect(page.getByTestId("supplement-result")).toContainText("수의사 확인 전에는 실제 급여량을 확정하지 마세요.");
+  expect(requestBody.task).toBe("supplement-recommendation");
+});
+
+test("동물병원·펫 일기·펫의 탐험 기록은 계정별 저장에 연결된다", async ({ page }) => {
+  test.slow();
+  await createPet(page, "기록이");
+  const places = page.getByRole("navigation", { name: "반려동물 장소" });
+
+  await places.getByRole("button", { name: /동물병원/ }).click();
+  await expect(page.getByTestId("pet-hospital-overlay")).toBeVisible();
+  await page.getByLabel("혈액형").selectOption({ label: "B형" });
+  await page.getByLabel("마이크로칩 번호").fill("410-TEST-2026");
+  await page.getByLabel("다니는 병원").fill("디하 동물병원");
+  await page.getByLabel("환자번호").fill("PAT-0827");
+  await page.getByRole("button", { name: "건강·연결 정보 저장" }).click();
+  await expect(page.getByText("병원 연동 승인 대기")).toBeVisible();
+  await page.getByText("＋ 진료기록 직접 등록").click();
+  await page.getByLabel("병원", { exact: true }).fill("디하 동물병원");
+  await page.getByLabel("진단/진료 항목").fill("정기 건강검진");
+  await page.getByLabel("처치·처방").fill("혈액검사와 기본 검진 완료");
+  await page.getByRole("button", { name: "진료기록 저장" }).click();
+  await expect(page.getByText("정기 건강검진")).toBeVisible();
+  await page.getByLabel("닫기").click();
+
+  await places.getByRole("button", { name: /펫 일기/ }).click();
+  await expect(page.getByTestId("pet-diary-overlay")).toBeVisible();
+  await page.locator(".memory-photo-picker input").setInputFiles({
+    name: "memory.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR42mP8z8Dwn4GBgYGJAQoAHgQCAUtBz3sAAAAASUVORK5CYII=", "base64")
+  });
+  await expect(page.getByAltText("대표사진 미리보기")).toBeVisible();
+  await page.getByLabel("추억 제목").fill("처음 함께 간 바다");
+  await page.getByLabel("함께한 이야기").fill("모래 위를 신나게 뛰어다녔어요.");
+  await page.getByRole("button", { name: "추억 등록" }).click();
+  await expect(page.getByText("처음 함께 간 바다")).toBeVisible();
+  await page.getByLabel("닫기").click();
+
+  await places.getByRole("button", { name: /펫의 탐험/ }).click();
+  await expect(page.getByTestId("pet-exploration-overlay")).toBeVisible();
+  await page.getByLabel("장소 이름").fill("반포한강공원");
+  await page.getByLabel("위도").fill("37.5105");
+  await page.getByLabel("경도").fill("126.9950");
+  await page.getByLabel("탐험 메모").fill("강변 산책과 노을 구경");
+  await page.getByRole("button", { name: "지도에 장소 저장" }).click();
+  await expect(page.getByText("반포한강공원").first()).toBeVisible();
+  await expect(page.getByTitle("반포한강공원 지도")).toBeVisible();
+  await page.getByLabel("닫기").click();
+
+  await page.reload();
+  await places.getByRole("button", { name: /동물병원/ }).click();
+  await expect(page.getByText("정기 건강검진")).toBeVisible();
+  await page.getByLabel("닫기").click();
+  await places.getByRole("button", { name: /펫 일기/ }).click();
+  await expect(page.getByText("처음 함께 간 바다")).toBeVisible();
+  await page.getByLabel("닫기").click();
+  await places.getByRole("button", { name: /펫의 탐험/ }).click();
+  await expect(page.getByText("반포한강공원").first()).toBeVisible();
 });
 
 test("생활 공간 다섯 곳이 고해상도 게임 배경으로 교체되고 방 이동에 맞춰 표시된다", async ({ page }) => {

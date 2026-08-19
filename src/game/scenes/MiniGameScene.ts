@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { ITEM_BY_ID } from "../../domain/catalog";
-import { OUTFIT_COLORS, breedDefinition, furColorValue, petAccentColor, type PetProfile } from "../../domain/pet";
+import { COLLAR_COLORS, OUTFIT_COLORS, breedDefinition, furColorValue, petAccentColor, type PetProfile } from "../../domain/pet";
 import type { MiniGameResult } from "../../domain/types";
 import { OCEAN_GAME_BY_ID, OCEAN_RUN_CHAPTERS, type OceanRunChapterId } from "../../domain/ocean";
 import { gameBridge } from "../bridge/GameBridge";
@@ -507,6 +507,81 @@ export class MiniGameScene extends Phaser.Scene {
     return container;
   }
 
+  private createJumpUpPet(x: number, y: number, profile: PetRenderProfile): Phaser.GameObjects.Container {
+    const breed = breedDefinition(profile.breed);
+    const muzzleColor = Phaser.Display.Color.IntegerToColor(profile.fur).lighten(28).color;
+    const shadow = this.add.ellipse(0, 29, 92, 18, 0x071c2c, 0.24);
+    const tail = profile.species === "cat"
+      ? this.add.arc(38, -17, 39, 225, 76, false, 0x000000, 0).setStrokeStyle(11, profile.fur)
+      : this.add.ellipse(43, -13, breed.coat === "fluffy" ? 48 : 39, breed.coat === "fluffy" ? 22 : 16, profile.fur).setAngle(-31);
+    const body = this.add.ellipse(0, -31, breed.size === "large" ? 94 : 84, 82, profile.fur)
+      .setStrokeStyle(2, 0xffffff, 0.28);
+    const bodyShade = this.add.ellipse(13, -24, 53, 62, profile.accent, profile.pattern === "solid" ? 0.08 : 0.18);
+    const outfit = profile.outfit === "none"
+      ? undefined
+      : this.add.ellipse(0, -29, breed.size === "large" ? 89 : 80, 70, profile.outfitColor).setStrokeStyle(2, 0xffffff, 0.32);
+    const chest = this.add.ellipse(-12, -47, 31, 40, 0xffffff, 0.13).setAngle(-15);
+    const leftLeg = this.add.ellipse(-24, 0, 27, 55, profile.fur).setStrokeStyle(1.5, profile.accent, 0.18);
+    const rightLeg = this.add.ellipse(24, 0, 27, 55, profile.fur).setStrokeStyle(1.5, profile.accent, 0.18);
+    const leftPaw = this.add.ellipse(-24, 21, 32, 19, profile.fur).setStrokeStyle(1.5, 0xffffff, 0.22);
+    const rightPaw = this.add.ellipse(24, 21, 32, 19, profile.fur).setStrokeStyle(1.5, 0xffffff, 0.22);
+
+    const head = this.add.ellipse(0, -91, 88, 78, profile.fur).setStrokeStyle(2.5, 0xffffff, 0.3);
+    const ears: Phaser.GameObjects.GameObject[] = profile.species === "cat" || breed.ears === "pointed"
+      ? [
+          this.add.triangle(-28, -117, -16, 23, 0, -22, 16, 23, profile.fur).setAngle(-7),
+          this.add.triangle(28, -117, -16, 23, 0, -22, 16, 23, profile.fur).setAngle(7)
+        ]
+      : [
+          this.add.ellipse(-43, -90, breed.coat === "silky" ? 31 : 27, breed.coat === "silky" ? 61 : 52, profile.fur).setAngle(13),
+          this.add.ellipse(43, -90, breed.coat === "silky" ? 31 : 27, breed.coat === "silky" ? 61 : 52, profile.fur).setAngle(-13)
+        ];
+    const faceMarkings: Phaser.GameObjects.GameObject[] = [];
+    if (profile.pattern === "bicolor" || profile.pattern === "points") {
+      faceMarkings.push(this.add.ellipse(0, -96, 61, profile.pattern === "points" ? 47 : 32, profile.accent, profile.pattern === "points" ? 0.72 : 0.58));
+    } else if (profile.pattern === "tabby") {
+      faceMarkings.push(
+        this.add.rectangle(-10, -119, 6, 23, profile.accent).setAngle(-10),
+        this.add.rectangle(0, -121, 6, 25, profile.accent),
+        this.add.rectangle(10, -119, 6, 23, profile.accent).setAngle(10)
+      );
+    } else if (profile.pattern === "spotted") {
+      faceMarkings.push(this.add.circle(-25, -108, 8, profile.accent, 0.7), this.add.circle(25, -101, 6, profile.accent, 0.65));
+    }
+    const leftBrow = this.add.arc(-18, -108, 11, 205, 335, false, 0x000000, 0).setStrokeStyle(2.5, profile.accent, 0.42);
+    const rightBrow = this.add.arc(18, -108, 11, 205, 335, false, 0x000000, 0).setStrokeStyle(2.5, profile.accent, 0.42);
+    const eyeColor = profile.species === "cat" ? 0x315f57 : 0x12191d;
+    const leftEye = this.add.ellipse(-18, -94, 19, 23, eyeColor).setStrokeStyle(1.5, 0x4a3d35, 0.55);
+    const rightEye = this.add.ellipse(18, -94, 19, 23, eyeColor).setStrokeStyle(1.5, 0x4a3d35, 0.55);
+    const leftEyeGlow = this.add.circle(-21, -99, 3.2, 0xffffff, 0.96);
+    const rightEyeGlow = this.add.circle(15, -99, 3.2, 0xffffff, 0.96);
+    const muzzle = this.add.ellipse(0, -76, breed.muzzle === "long" ? 48 : 41, 31, muzzleColor, 0.96);
+    const muzzleGlow = this.add.ellipse(-7, -82, 20, 9, 0xffffff, 0.2).setAngle(-10);
+    const nose = this.add.ellipse(0, -82, 13, 10, 0x202628).setStrokeStyle(1, 0xffffff, 0.22);
+    const noseGlow = this.add.ellipse(-2.5, -85, 4, 2.5, 0xffffff, 0.45);
+    const smile = this.add.arc(0, -73, 9, 12, 168, false, 0x000000, 0).setStrokeStyle(2, 0x8f4c48);
+
+    const poseParts: Phaser.GameObjects.GameObject[] = [tail, body, bodyShade];
+    if (outfit) poseParts.push(outfit);
+    poseParts.push(chest, leftLeg, rightLeg, ...ears, head, ...faceMarkings, leftBrow, rightBrow, leftEye, rightEye, leftEyeGlow, rightEyeGlow, muzzle, muzzleGlow, nose, noseGlow, smile);
+    if (profile.collar !== "none") {
+      const collar = this.add.graphics();
+      collar.fillStyle(this.hexColor(COLLAR_COLORS[profile.collar]), 1).fillRoundedRect(-43, -64, 86, 14, 7);
+      collar.lineStyle(2, 0xffffff, 0.32).strokeRoundedRect(-43, -64, 86, 14, 7);
+      poseParts.push(collar, this.add.circle(0, -49, 7, 0xf2c954).setStrokeStyle(1.5, 0xffffff, 0.5));
+    }
+    poseParts.push(leftPaw, rightPaw);
+    const pose = this.add.container(0, 0, poseParts);
+    this.addFrontPetAccessories(pose, profile);
+    const runner = this.add.container(x, y, [shadow, pose]).setScale(breed.size === "large" ? 0.86 : 0.82);
+    runner.setData("foot-offset", 25).setData("jump-pose", pose).setData("pet-breed", profile.breed);
+    if (!this.registry.get("reduced-motion")) {
+      this.tweens.add({ targets: tail, angle: tail.angle + 16, duration: 430, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+      this.tweens.add({ targets: [leftEye, rightEye, leftEyeGlow, rightEyeGlow], scaleY: 0.12, duration: 72, yoyo: true, repeat: -1, repeatDelay: 2_600 });
+    }
+    return runner;
+  }
+
   private addFrontPetAccessories(container: Phaser.GameObjects.Container, profile: PetRenderProfile): void {
     if (profile.accessory === "round" || profile.accessory === "square" || profile.accessory === "sunglasses") {
       const square = profile.accessory === "square";
@@ -649,7 +724,7 @@ export class MiniGameScene extends Phaser.Scene {
 
     const initialPlatforms: Array<[number, number]> = [[620, 1], [522, 1], [430, 0], [338, 1], [246, 2], [154, 1], [68, 0]];
     for (const [y, lane] of initialPlatforms) this.createJumpPlatform(y, lane, y === 620);
-    this.runner = this.createSportPet(this.lanes[1] ?? 195, 588, 0.72, this.playerPetProfile(), false).setDepth(14);
+    this.runner = this.createJumpUpPet(this.lanes[1] ?? 195, 588, this.playerPetProfile()).setDepth(14);
     this.jumpVelocityY = -430;
     this.createOceanDhaHud();
 
@@ -707,7 +782,7 @@ export class MiniGameScene extends Phaser.Scene {
     }
 
     const seconds = delta / 1000;
-    const footOffset = 25;
+    const footOffset = Number(this.runner.getData("foot-offset")) || 25;
     const previousFoot = this.runner.y + footOffset;
     this.jumpVelocityY += 780 * seconds;
     this.runner.y += this.jumpVelocityY * seconds;
@@ -816,7 +891,8 @@ export class MiniGameScene extends Phaser.Scene {
     if (this.gameId !== "jump-up" || !this.runner || this.finished || !this.jumpBoostAvailable) return;
     this.jumpBoostAvailable = false;
     this.jumpVelocityY = Math.min(this.jumpVelocityY, -445);
-    this.tweens.add({ targets: this.runner, scaleX: 0.76, scaleY: 0.68, duration: 85, yoyo: true, ease: "Sine.easeOut" });
+    const pose = this.runner.getData("jump-pose") as Phaser.GameObjects.Container | undefined;
+    if (pose) this.tweens.add({ targets: pose, scaleX: 1.035, scaleY: 0.965, y: 2, duration: 85, yoyo: true, ease: "Sine.easeOut" });
   }
 
   private createOceanRun(): void {

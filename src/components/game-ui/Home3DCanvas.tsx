@@ -59,10 +59,10 @@ const ROOM_CENTER: Record<IndoorRoom, THREE.Vector3> = {
 
 const PET_PLACE_MENU = [
   { id: "hospital", icon: "✚", label: "동물병원", caption: "건강 기록과 진료" },
-  { id: "cafe", icon: "☕", label: "애견 카페", caption: "친구들과 교감" },
-  { id: "walk", icon: "♧", label: "산책로", caption: "산책과 탐험" },
+  { id: "cafe", icon: "✎", label: "펫 일기", caption: "사진과 추억 기록" },
+  { id: "walk", icon: "⌖", label: "펫의 탐험", caption: "함께한 장소 지도" },
   { id: "grooming", icon: "✂", label: "미용실", caption: "목욕과 그루밍" },
-  { id: "shop", icon: "◈", label: "펫샵", caption: "용품과 스타일" }
+  { id: "shop", icon: "◈", label: "반려동물 영양제 추천", caption: "AI 맞춤 영양 분석" }
 ] as const;
 
 export function Home3DCanvas({ currentRoom, appearance, equipped, reducedMotion, tired, onRoomChange }: Home3DCanvasProps) {

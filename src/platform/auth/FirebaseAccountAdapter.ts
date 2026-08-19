@@ -59,4 +59,9 @@ export class FirebaseAccountAdapter implements AccountAdapter {
   async signOut(): Promise<void> {
     await firebaseSignOut(this.auth);
   }
+
+  async getIdToken(): Promise<string | null> {
+    await this.authReady;
+    return this.auth.currentUser?.getIdToken() ?? null;
+  }
 }

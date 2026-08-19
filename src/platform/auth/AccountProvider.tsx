@@ -8,6 +8,7 @@ interface AccountContextValue extends AccountSnapshot {
   error: string | null;
   signInWithGoogle(): Promise<GameAccount | null>;
   signOut(): Promise<void>;
+  getIdToken(): Promise<string | null>;
 }
 
 const AccountContext = createContext<AccountContextValue | null>(null);
@@ -71,7 +72,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     }
   }, [adapter]);
 
-  return <AccountContext.Provider value={{ ...snapshot, busy, error, signInWithGoogle, signOut }}>{children}</AccountContext.Provider>;
+  const getIdToken = useCallback(() => adapter?.getIdToken() ?? Promise.resolve(null), [adapter]);
+
+  return <AccountContext.Provider value={{ ...snapshot, busy, error, signInWithGoogle, signOut, getIdToken }}>{children}</AccountContext.Provider>;
 }
 
 // eslint-disable-next-line react-refresh/only-export-components

@@ -1,10 +1,30 @@
 import react from "@vitejs/plugin-react";
+import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
+import { petResearchHandler } from "./server/petResearch";
+
+function petResearchDevApi(): Plugin {
+  const attach = (middlewares: { use(path: string, handler: (request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse) => void): void }) => {
+    middlewares.use("/api/pet-research", (request, response) => {
+      void petResearchHandler(request, response);
+    });
+  };
+  return {
+    name: "diha-pet-research-dev-api",
+    configureServer(server) {
+      attach(server.middlewares);
+    },
+    configurePreviewServer(server) {
+      attach(server.middlewares);
+    }
+  };
+}
 
 export default defineConfig({
   plugins: [
     react(),
+    petResearchDevApi(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icon.svg"],
@@ -30,7 +50,7 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,jpg,jpeg,webmanifest}"],
         globIgnores: ["assets/*-photoreal-v1.jpg"],
         navigateFallback: "/index.html",
-        navigateFallbackDenylist: [/^\/__\/auth\//, /^\/__\/firebase\//],
+        navigateFallbackDenylist: [/^\/api\//, /^\/__\/auth\//, /^\/__\/firebase\//],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === "audio",

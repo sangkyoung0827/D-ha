@@ -18,7 +18,7 @@ export const DEFAULT_PROFILE: PetProfile = {
 export function createDefaultSave(now = new Date(), profile = DEFAULT_PROFILE): GameSave {
   const date = localDateKey(now);
   return {
-    version: 5,
+    version: 6,
     profile,
     tutorialComplete: false,
     needs: { satiety: 78, hygiene: 76, energy: 72, joy: 80, condition: 77 },
@@ -55,6 +55,14 @@ export function createDefaultSave(now = new Date(), profile = DEFAULT_PROFILE): 
       careActions: 0
     },
     greetedFriends: {},
-    notifications: []
+    notifications: [],
+    petMedical: {
+      bloodType: "미확인",
+      microchipId: "",
+      hospital: { hospitalName: "", patientNumber: "", status: "not-connected", lastSyncedAt: null },
+      records: []
+    },
+    petMemories: [],
+    petExplorations: []
   };
 }

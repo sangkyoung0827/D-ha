@@ -3,18 +3,21 @@ import type { PetProfile } from "../../domain/pet";
 import type { RoomId } from "../../domain/types";
 import { gameBridge } from "../../game/bridge/GameBridge";
 import { PetAvatar } from "../pet/PetAvatar";
+import { PetResearchChat } from "./PetResearchChat";
 
 const PET_PLACE_MENU = [
-  { id: "hospital", icon: "✚", label: "동물병원", caption: "건강 기록과 진료" },
-  { id: "cafe", icon: "☕", label: "애견 카페", caption: "친구들과 교감" },
-  { id: "walk", icon: "♧", label: "산책로", caption: "산책과 탐험" },
+  { id: "hospital", icon: "✚", label: "동물병원", caption: "진료기록과 건강정보", overlay: "pet-hospital" },
+  { id: "diary", icon: "✎", label: "펫 일기", caption: "사진과 추억 기록", overlay: "pet-diary" },
+  { id: "exploration", icon: "⌖", label: "펫의 탐험", caption: "함께한 장소 지도", overlay: "pet-exploration" },
   { id: "grooming", icon: "✂", label: "미용실", caption: "목욕과 그루밍" },
-  { id: "shop", icon: "◈", label: "펫샵", caption: "용품과 스타일" }
+  { id: "shop", icon: "◈", label: "반려동물 영양제 추천", caption: "AI 맞춤 영양 분석", overlay: "pet-supplement" }
 ] as const;
 
 type PetReaction = "happy" | "eat" | "sleep" | "wash" | "jump" | null;
 
-export function HomePetScene({ appearance, reducedMotion, onRoomChange }: { appearance: PetProfile; reducedMotion: boolean; onRoomChange(room: RoomId): void }) {
+type PetPlaceOverlay = "pet-hospital" | "pet-diary" | "pet-exploration" | "pet-supplement";
+
+export function HomePetScene({ appearance, reducedMotion, onRoomChange, onOpenPlace }: { appearance: PetProfile; reducedMotion: boolean; onRoomChange(room: RoomId): void; onOpenPlace(overlay: PetPlaceOverlay): void }) {
   const [selectedPlace, setSelectedPlace] = useState<(typeof PET_PLACE_MENU)[number]>(PET_PLACE_MENU[2]);
   const [reaction, setReaction] = useState<PetReaction>(null);
   const reactionTimer = useRef<number | null>(null);
@@ -67,9 +70,14 @@ export function HomePetScene({ appearance, reducedMotion, onRoomChange }: { appe
         aria-label={`${place.label}: ${place.caption}`}
         aria-pressed={selectedPlace.id === place.id}
         data-testid={`pet-place-${place.id}`}
-        onClick={() => { setSelectedPlace(place); react("happy"); }}
+        onClick={() => {
+          setSelectedPlace(place);
+          react("happy");
+          if ("overlay" in place) onOpenPlace(place.overlay);
+        }}
       ><b aria-hidden="true">{place.icon}</b><span><strong>{place.label}</strong><small>{place.caption}</small></span></button>)}
     </nav>
+    <PetResearchChat pet={appearance} />
     {(["kitchen", "bathroom", "bedroom", "wardrobe"] as const).map((room) => <button key={room} className="sr-only" data-testid={`home-static-room-${room}`} onClick={() => onRoomChange(room)}>{room} 이동</button>)}
   </div>;
 }

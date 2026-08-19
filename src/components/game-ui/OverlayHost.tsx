@@ -10,6 +10,8 @@ import { socialProvider, type GameFriend } from "../../platform/social/SocialPro
 import { useGameStore } from "../../store/gameStore";
 import { VoiceEchoPanel } from "../settings/VoiceEchoPanel";
 import { FoodIllustration } from "./FoodIllustration";
+import { PetDiaryOverlay, PetExplorationOverlay, PetHospitalOverlay } from "./PetPlaceOverlays";
+import { PetSupplementRecommendation } from "./PetSupplementRecommendation";
 
 const CATEGORY_LABELS: Record<ItemCategory, string> = {
   food: "음식",
@@ -27,10 +29,11 @@ const CATEGORY_LABELS: Record<ItemCategory, string> = {
 export function OverlayHost() {
   const overlay = useGameStore((state) => state.overlay);
   const setOverlay = useGameStore((state) => state.setOverlay);
+  const profile = useGameStore((state) => state.profile);
   if (overlay === "none") return null;
   return (
     <div className="overlay-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setOverlay("none"); }}>
-      <section className={`sheet ${overlay === "fridge" ? "fridge-sheet" : ""} ${overlay === "pet-store" ? "pet-store-sheet" : ""}`} role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-testid={overlay === "fridge" ? "fridge-overlay" : overlay === "pet-store" ? "pet-store-overlay" : undefined}>
+      <section className={`sheet ${overlay === "fridge" ? "fridge-sheet" : ""} ${overlay === "pet-store" ? "pet-store-sheet" : ""} ${overlay.startsWith("pet-") && overlay !== "pet-store" ? "pet-feature-sheet" : ""}`} role="dialog" aria-modal="true" aria-labelledby="sheet-title" data-testid={overlay === "fridge" ? "fridge-overlay" : overlay === "pet-store" ? "pet-store-overlay" : undefined}>
         <button className="sheet-close" onClick={() => setOverlay("none")} aria-label="닫기">×</button>
         {overlay === "fridge" && <FridgeOverlay />}
         {overlay === "shop" && <ShopOverlay />}
@@ -42,6 +45,10 @@ export function OverlayHost() {
         {overlay === "settings" && <SettingsOverlay />}
         {overlay === "daily" && <DailyOverlay />}
         {overlay === "notifications" && <NotificationsOverlay />}
+        {overlay === "pet-hospital" && <PetHospitalOverlay />}
+        {overlay === "pet-diary" && <PetDiaryOverlay />}
+        {overlay === "pet-exploration" && <PetExplorationOverlay />}
+        {overlay === "pet-supplement" && <PetSupplementRecommendation pet={profile} />}
       </section>
     </div>
   );

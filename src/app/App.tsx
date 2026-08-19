@@ -129,7 +129,7 @@ export function App() {
         <StatusBar needs={needs} />
         <GameRoom room={currentRoom} petName={profile.name} immersive={Boolean(activeMiniGame)}>
           {!activeMiniGame && currentRoom === "studio"
-            ? <HomePetScene appearance={profile} reducedMotion={settings.reducedMotion} onRoomChange={(room) => { setBathProgress(0); setRoom(room); }} />
+            ? <HomePetScene appearance={profile} reducedMotion={settings.reducedMotion} onRoomChange={(room) => { setBathProgress(0); setRoom(room); }} onOpenPlace={setOverlay} />
             : !activeMiniGame && isHomeInterior(currentRoom)
             ? <Suspense fallback={<div className="home3d-loading" role="status">3D 집을 여는 중...</div>}><Home3DCanvas currentRoom={currentRoom} equipped={equipped} appearance={profile} reducedMotion={settings.reducedMotion} tired={needs.energy < 25} onRoomChange={(room) => {
                   if (room === "wellness") { setOceanMode("exploration"); setOceanZone("beach"); }

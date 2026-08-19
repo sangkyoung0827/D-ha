@@ -28,6 +28,10 @@ export class E2eAccountAdapter implements AccountAdapter {
     this.emit();
   }
 
+  async getIdToken(): Promise<string | null> {
+    return localStorage.getItem(STORAGE_KEY) === TEST_ACCOUNT.uid ? TEST_ACCOUNT.uid : null;
+  }
+
   private snapshot(): AccountSnapshot {
     return localStorage.getItem(STORAGE_KEY) === TEST_ACCOUNT.uid
       ? { status: "signed-in", account: TEST_ACCOUNT }
