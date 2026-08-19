@@ -30,6 +30,7 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,svg,jpg,jpeg,webmanifest}"],
         globIgnores: ["assets/*-photoreal-v1.jpg"],
         navigateFallback: "/index.html",
+        navigateFallbackDenylist: [/^\/__\/auth\//, /^\/__\/firebase\//],
         runtimeCaching: [
           {
             urlPattern: ({ request }) => request.destination === "audio",
