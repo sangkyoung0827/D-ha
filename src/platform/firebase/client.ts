@@ -2,7 +2,7 @@ import { getApp, getApps, initializeApp, type FirebaseApp, type FirebaseOptions 
 
 const DIHA_FIREBASE_OPTIONS: FirebaseOptions = {
   apiKey: "AIzaSyC-DUKllObF3QMPLS2RR-kvlwfGu1XpqyU",
-  authDomain: "d-ha-game.firebaseapp.com",
+  authDomain: "d-ha.vercel.app",
   projectId: "d-ha-game",
   storageBucket: "d-ha-game.firebasestorage.app",
   messagingSenderId: "541499327982",
