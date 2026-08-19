@@ -22,22 +22,31 @@ function toGameAccount(user: User): GameAccount {
 
 export class FirebaseAccountAdapter implements AccountAdapter {
   private auth = getAuth(getFirebaseClient());
+  private persistenceReady = setPersistence(this.auth, browserLocalPersistence);
 
   constructor() {
     this.auth.useDeviceLanguage();
   }
 
   subscribe(listener: (snapshot: AccountSnapshot) => void): () => void {
-    void setPersistence(this.auth, browserLocalPersistence);
-    return onAuthStateChanged(this.auth, (user) => {
-      listener(user
-        ? { status: "signed-in", account: toGameAccount(user) }
-        : { status: "signed-out", account: null });
-    });
+    let active = true;
+    let unsubscribe: () => void = () => {};
+    const beginObserving = () => {
+      if (!active) return;
+      unsubscribe = onAuthStateChanged(this.auth, (user) => {
+        listener(user
+          ? { status: "signed-in", account: toGameAccount(user) }
+          : { status: "signed-out", account: null });
+      });
+    };
+    void this.persistenceReady.then(beginObserving, beginObserving);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }
 
   async signInWithGoogle(): Promise<GameAccount> {
-    await setPersistence(this.auth, browserLocalPersistence);
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
     const result = await signInWithPopup(this.auth, provider);
