@@ -14,6 +14,7 @@ import { FoodIllustration } from "./FoodIllustration";
 const CATEGORY_LABELS: Record<ItemCategory, string> = {
   food: "음식",
   wellness: "웰니스",
+  "ocean-gear": "탐험 장비",
   top: "상의",
   bottom: "하의",
   shoes: "신발",
@@ -55,7 +56,7 @@ function FridgeOverlay() {
 
   const eat = (itemId: string) => {
     care("feed", itemId);
-    gameBridge.emit("keeper:react", { action: "feed" });
+    gameBridge.emit("pet:react", { action: "feed" });
     playFeedbackTone(settings.sound, 540);
     vibrateFeedback(settings.vibration);
   };
@@ -104,12 +105,12 @@ function ShopOverlay() {
   const inventory = useGameStore((state) => state.inventory);
   const purchase = useGameStore((state) => state.purchase);
   const items = ITEM_CATALOG.filter((item) => item.category === category);
-  return <><SheetHeader eyebrow="ROOM SUPPLY" title={`${roomShopTitle(room)} 아이템`} copy="이 공간에서 사용하는 게임 아이템만 표시합니다." /><div className="shop-wallet"><span>보유 코인</span><strong>● {coins.toLocaleString()}</strong></div>{categories.length > 1 && <div className="category-tabs">{categories.map((key) => <button key={key} className={category === key ? "active" : ""} onClick={() => setCategory(key)}>{CATEGORY_LABELS[key]}</button>)}</div>}<div className="catalog-grid">{items.map((item) => { const locked = level < item.requiredLevel; const poor = coins < item.price; return <article key={item.id} className={locked ? "locked" : ""}><i style={{ background: item.color }}>{item.symbol}</i><div><h3>{item.name}</h3><p>{item.description}</p><small>{inventory[item.id] ? `보유 ${inventory[item.id]}개` : `Level ${item.requiredLevel}`}</small></div><button data-testid={`buy-${item.id}`} disabled={locked || poor} onClick={() => purchase(item.id)}>{locked ? `LV.${item.requiredLevel}` : `● ${item.price}`}</button></article>; })}</div></>;
+  return <><SheetHeader eyebrow={category === "ocean-gear" ? "OCEAN RUN SUPPLY" : "ROOM SUPPLY"} title={`${roomShopTitle(room)} 아이템`} copy={category === "ocean-gear" ? "구매한 산소통과 잠수함은 이 계정에 영구 보관되고 다음 챕터를 열어 줍니다." : "이 공간에서 사용하는 게임 아이템만 표시합니다."} /><div className="shop-wallet"><span>보유 코인</span><strong>● {coins.toLocaleString()}</strong></div>{categories.length > 1 && <div className="category-tabs">{categories.map((key) => <button key={key} className={category === key ? "active" : ""} onClick={() => setCategory(key)}>{CATEGORY_LABELS[key]}</button>)}</div>}<div className="catalog-grid">{items.map((item) => { const locked = level < item.requiredLevel; const poor = coins < item.price; const ownedGear = item.category === "ocean-gear" && (inventory[item.id] ?? 0) > 0; return <article key={item.id} className={locked ? "locked" : ""}><i style={{ background: item.color }}>{item.symbol}</i><div><h3>{item.name}</h3><p>{item.description}</p><small>{inventory[item.id] ? item.category === "ocean-gear" ? "영구 장비 보유 중" : `보유 ${inventory[item.id]}개` : `Level ${item.requiredLevel}`}</small></div><button data-testid={`buy-${item.id}`} disabled={locked || poor || ownedGear} onClick={() => purchase(item.id)}>{ownedGear ? "보유 중" : locked ? `LV.${item.requiredLevel}` : `● ${item.price}`}</button></article>; })}</div></>;
 }
 
 function shopCategories(room: RoomId): ItemCategory[] {
   if (room === "kitchen") return ["food"];
-  if (room === "wellness") return ["wellness"];
+  if (room === "wellness") return ["ocean-gear"];
   if (room === "wardrobe") return ["top", "bottom", "shoes", "accessory"];
   if (room === "bedroom") return ["theme", "decoration"];
   if (room === "game-room") return ["accessory"];

@@ -9,7 +9,6 @@ import { levelFromXp, LEVEL_THRESHOLDS } from "../domain/progression";
 import { isOceanGame, oceanCompletionCopy, oceanGameNeedEffects } from "../domain/ocean";
 import { loadCloudGame, saveCloudGame } from "../platform/cloud/FirebaseGameSaveProvider";
 import type {
-  CharacterProfile,
   GameNotification,
   GameSave,
   GameSettings,
@@ -18,6 +17,7 @@ import type {
   RoomId,
   WearableSlot
 } from "../domain/types";
+import type { PetProfile } from "../domain/pet";
 import { clearGame, loadGame, saveGame } from "./persistence";
 import { parseImportedSave } from "./migrations";
 import { newestAccountSave } from "./accountSave";
@@ -39,7 +39,7 @@ interface GameRuntime {
 
 interface GameActions {
   hydrate(userId?: string | null): Promise<void>;
-  createKeeper(profile: CharacterProfile): void;
+  createPet(profile: PetProfile): void;
   finishTutorial(): void;
   setRoom(room: RoomId): void;
   setOverlay(overlay: OverlayId): void;
@@ -83,7 +83,7 @@ function addNotification(save: GameSave, notification: Omit<GameNotification, "i
 
 function saveFromStore(state: GameStore): GameSave {
   return {
-    version: 4,
+    version: 5,
     profile: state.profile,
     tutorialComplete: state.tutorialComplete,
     needs: state.needs,
@@ -269,7 +269,7 @@ export const useGameStore = create<GameStore>((set, get) => {
       }
     },
 
-    createKeeper(profile) {
+    createPet(profile) {
       const next = createDefaultSave(new Date(), profile);
       set({ ...next, hydrated: true, toast: `${profile.name}와의 첫 항해를 시작해요.` });
       void persist(next);

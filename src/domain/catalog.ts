@@ -16,6 +16,9 @@ export const ITEM_CATALOG: ItemDefinition[] = [
   { id: "well-style", category: "wellness", name: "스타일 체인지 토닉", description: "옷장으로 이동하는 게임 아이템", price: 90, requiredLevel: 5, effects: { joy: 8 }, color: "#a890df", symbol: "✧" },
   { id: "well-growth", category: "wellness", name: "성장 프리뷰 캡슐", description: "다음 해금을 미리 보여줘요", price: 110, requiredLevel: 7, effects: { joy: 10 }, color: "#6c9ee8", symbol: "◇" },
 
+  { id: "ocean-oxygen-tank", category: "ocean-gear", name: "딥 브레스 산소통", description: "해저 동굴 챕터 진입에 필요한 영구 탐험 장비", price: 160, requiredLevel: 1, color: "#35b9b0", symbol: "O₂" },
+  { id: "ocean-submarine", category: "ocean-gear", name: "디하 미니 잠수함", description: "심해 챕터 진입에 필요한 영구 탐험 장비", price: 280, requiredLevel: 1, color: "#efb84f", symbol: "◉" },
+
   { id: "top-rookie", category: "top", name: "화이트 반팔 티셔츠", description: "디하의 산뜻한 기본 반팔", price: 0, requiredLevel: 1, wearableSlot: "top", color: "#f7f7f2", symbol: "▱" },
   { id: "top-coast", category: "top", name: "코스트 셔츠", description: "바람이 통하는 셔츠", price: 140, requiredLevel: 2, wearableSlot: "top", color: "#65c7c1", symbol: "▱" },
   { id: "top-reef", category: "top", name: "리프 베스트", description: "산호 조사용 베스트", price: 190, requiredLevel: 4, wearableSlot: "top", color: "#ef8576", symbol: "▱" },

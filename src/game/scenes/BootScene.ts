@@ -13,6 +13,13 @@ export class BootScene extends Phaser.Scene {
     this.load.image("bedroom-game", "/assets/bedroom-game-v2.jpg");
     this.load.image("wardrobe-game", "/assets/wardrobe-game-v2.jpg");
     this.load.image("workout-game", "/assets/workout-game-v2.jpg");
+    this.load.image("ocean-run-beach", "/assets/ocean-run-beach-v1.jpg");
+    this.load.image("ocean-run-surf", "/assets/ocean-run-surf-v1.jpg");
+    this.load.image("ocean-run-cave", "/assets/ocean-run-cave-v1.jpg");
+    this.load.image("ocean-run-deepsea", "/assets/ocean-run-deepsea-v1.jpg");
+    this.load.image("ocean-run-surfboard", "/assets/ocean-run-surfboard-v1.png");
+    this.load.image("ocean-run-palm", "/assets/ocean-run-palm-v1.png");
+    this.load.image("ocean-run-driftwood", "/assets/ocean-run-driftwood-v1.png");
   }
 
   create(): void {

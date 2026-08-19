@@ -20,7 +20,7 @@ export function ContextTray({ room, bathProgress }: ContextTrayProps) {
 
   const perform = (action: "feed" | "wash" | "sleep" | "wellness" | "play", itemId?: string) => {
     care(action, itemId);
-    gameBridge.emit("keeper:react", { action });
+    gameBridge.emit("pet:react", { action });
     playFeedbackTone(settings.sound, action === "sleep" ? 330 : 540);
     vibrateFeedback(settings.vibration);
   };

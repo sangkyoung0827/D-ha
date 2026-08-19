@@ -1,3 +1,5 @@
+import type { PetProfile } from "./pet";
+
 export type RoomId =
   | "studio"
   | "kitchen"
@@ -18,25 +20,10 @@ export interface NeedValues {
   condition: number;
 }
 
-export type SkinTone = "porcelain" | "sunrise" | "sand" | "golden" | "cocoa" | "deep";
-export type HairStyle = "straight" | "wave" | "crop" | "side-part" | "bob" | "bun" | "curl" | "ponytail";
-export type HairColor = "midnight" | "espresso" | "chestnut" | "caramel" | "coral" | "silver";
-export type GlassesStyle = "none" | "round" | "square" | "aviator";
-
-export interface CharacterAppearance {
-  skinTone: SkinTone;
-  hairStyle: HairStyle;
-  hairColor: HairColor;
-  glassesStyle: GlassesStyle;
-}
-
-export interface CharacterProfile extends CharacterAppearance {
-  name: string;
-}
-
 export type ItemCategory =
   | "food"
   | "wellness"
+  | "ocean-gear"
   | "top"
   | "bottom"
   | "shoes"
@@ -110,6 +97,7 @@ export type MiniGameId =
   | "bubble-focus"
   | "current-run"
   | "reef-memory"
+  | "ocean-run"
   | "beach-volleyball"
   | "beach-pingpong"
   | "beach-football"
@@ -126,8 +114,8 @@ export interface MiniGameResult {
 }
 
 export interface GameSave {
-  version: 4;
-  profile: CharacterProfile;
+  version: 5;
+  profile: PetProfile;
   tutorialComplete: boolean;
   needs: NeedValues;
   lastSavedAt: string;

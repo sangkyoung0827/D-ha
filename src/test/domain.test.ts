@@ -17,15 +17,16 @@ import {
 } from "../domain/economy";
 import { levelFromXp } from "../domain/progression";
 import { migrateSave, parseImportedSave } from "../store/migrations";
-import { isOceanGame, isOceanZoneUnlocked, oceanGameNeedEffects } from "../domain/ocean";
-import { GLASSES_STYLES, HAIR_COLORS, HAIR_STYLES, SKIN_TONES } from "../domain/appearance";
+import { OCEAN_GAME_BY_ID, OCEAN_RUN_CHAPTERS, isOceanGame, oceanGameNeedEffects, ownsOceanGear } from "../domain/ocean";
+import { FUR_COLORS, PET_ACCESSORIES, PET_ANIMATIONS, PET_BREEDS, PET_COLLARS, PET_HATS, PET_OUTFITS, PET_PATTERNS } from "../domain/pet";
 import { ITEM_BY_ID } from "../domain/catalog";
 import { newestAccountSave } from "../store/accountSave";
 import { persistenceKeyForOwner } from "../store/persistence";
+import { isHomeInterior, topLevelRoom } from "../domain/home";
 
 const start = new Date("2026-08-01T00:00:00.000Z");
 
-describe("Keeper 상태 계산", () => {
+describe("반려동물 상태 계산", () => {
   it("경과 시간만큼 각 상태를 감소시킨다", () => {
     const save = createDefaultSave(start);
     const result = applyElapsedTime(save.needs, start.toISOString(), new Date("2026-08-01T02:00:00.000Z"));
@@ -90,32 +91,51 @@ describe("경제와 성장", () => {
 });
 
 describe("바다 생태계 진행", () => {
-  it("직전 생태 구간을 완주한 순서대로 다음 수심을 연다", () => {
-    expect(isOceanZoneUnlocked("beach", {})).toBe(true);
-    expect(isOceanZoneUnlocked("open-water", {})).toBe(false);
-    expect(isOceanZoneUnlocked("open-water", { "beach-volleyball": 120 })).toBe(true);
-    expect(isOceanZoneUnlocked("surf", { "beach-volleyball": 120 })).toBe(false);
-    expect(isOceanZoneUnlocked("surf", { "open-water-catch": 300 })).toBe(true);
+  it("기존 Ocean 게임 대신 네 챕터가 연결된 단일 Ocean Run만 제공한다", () => {
+    expect(Array.from(OCEAN_GAME_BY_ID.keys())).toEqual(["ocean-run"]);
+    expect(OCEAN_RUN_CHAPTERS.map((chapter) => chapter.id)).toEqual(["beach", "surf", "cave", "deepsea"]);
+    expect(isOceanGame("ocean-run")).toBe(true);
+    expect(isOceanGame("beach-volleyball")).toBe(false);
   });
 
-  it("바다 수영 포획 성공은 제품 없이 게임 속 DHA 상태 효과를 준다", () => {
-    const result = { gameId: "open-water-catch" as const, score: 500, success: true, durationMs: 38_000 };
+  it("산소통과 잠수함은 계정 인벤토리 소유 여부로 각 챕터를 연다", () => {
+    expect(ownsOceanGear({})).toEqual({ oxygenTank: false, submarine: false });
+    expect(ownsOceanGear({ "ocean-oxygen-tank": 1, "ocean-submarine": 1 })).toEqual({ oxygenTank: true, submarine: true });
+    const result = { gameId: "ocean-run" as const, score: 500, success: true, durationMs: 48_000 };
     expect(isOceanGame(result.gameId)).toBe(true);
-    expect(oceanGameNeedEffects(result)).toEqual({ satiety: 18, joy: 9, energy: -6 });
+    expect(oceanGameNeedEffects(result)).toEqual({ joy: 16, energy: -7 });
+  });
+});
+
+describe("집과 야외 공간 구성", () => {
+  it("거실·주방·욕실·침실·옷장은 Home으로 묶고 Ocean과 Workout만 야외로 둔다", () => {
+    expect(["studio", "kitchen", "bathroom", "bedroom", "wardrobe"].every((room) => isHomeInterior(room as Parameters<typeof isHomeInterior>[0]))).toBe(true);
+    expect(isHomeInterior("wellness")).toBe(false);
+    expect(isHomeInterior("game-room")).toBe(false);
+    expect(topLevelRoom("kitchen")).toBe("studio");
+    expect(topLevelRoom("bedroom")).toBe("studio");
+    expect(topLevelRoom("wellness")).toBe("wellness");
+    expect(topLevelRoom("game-room")).toBe("game-room");
   });
 });
 
 describe("진행 데이터", () => {
-  it("초기 디하는 세분화된 외형 선택과 흰 반팔·청바지 복장을 사용한다", () => {
+  it("강아지·고양이 10종과 세분화된 반려동물 외형을 제공한다", () => {
     const save = createDefaultSave(start);
 
-    expect(SKIN_TONES).toHaveLength(6);
-    expect(HAIR_STYLES).toHaveLength(8);
-    expect(HAIR_COLORS).toHaveLength(6);
-    expect(GLASSES_STYLES).toHaveLength(4);
-    expect(save.profile.glassesStyle).toBe("none");
+    expect(PET_BREEDS).toHaveLength(10);
+    expect(PET_BREEDS.filter((breed) => breed.species === "dog")).toHaveLength(5);
+    expect(PET_BREEDS.filter((breed) => breed.species === "cat")).toHaveLength(5);
+    expect(FUR_COLORS.length).toBeGreaterThanOrEqual(8);
+    expect(PET_PATTERNS).toHaveLength(5);
+    expect(PET_COLLARS).toHaveLength(5);
+    expect(PET_HATS).toHaveLength(4);
+    expect(PET_ACCESSORIES).toHaveLength(5);
+    expect(PET_OUTFITS).toHaveLength(5);
+    expect(PET_ANIMATIONS).toEqual(["idle", "walk", "run", "eat", "sleep", "wash", "happy", "tired", "jump"]);
+    expect(save.profile.breed).toBe("maltese");
+    expect(save.profile.accessory).toBe("none");
     expect(ITEM_BY_ID[save.equipped.top!]?.name).toBe("화이트 반팔 티셔츠");
-    expect(ITEM_BY_ID[save.equipped.bottom!]?.name).toBe("클래식 청바지");
   });
 
   it("이미 열린 업적 보상을 중복 지급하지 않는다", () => {
@@ -141,31 +161,33 @@ describe("진행 데이터", () => {
     expect(refreshed.goals.every((goal) => goal.progress === 0 && !goal.completed)).toBe(true);
   });
 
-  it("v3 저장 데이터를 안경 기본값이 있는 현재 v4 스키마로 마이그레이션한다", () => {
+  it("기존 사람 외형 저장을 진행 상태를 보존한 반려동물 v5 저장으로 마이그레이션한다", () => {
     const current = createDefaultSave(start);
     const legacyProfile = {
       name: current.profile.name,
-      skinTone: current.profile.skinTone,
-      hairStyle: current.profile.hairStyle,
-      hairColor: current.profile.hairColor
+      skinTone: "sand",
+      hairStyle: "wave",
+      hairColor: "midnight",
+      glassesStyle: "round"
     };
-    const legacy = { ...current, version: 3, profile: legacyProfile, coins: 777 };
+    const legacy = { ...current, version: 4, profile: legacyProfile, coins: 777 };
     const result = migrateSave(legacy, start);
 
     expect(result.status).toBe("migrated");
-    expect(result.save.version).toBe(4);
-    expect(result.save.profile.glassesStyle).toBe("none");
+    expect(result.save.version).toBe(5);
+    expect(result.save.profile.name).toBe(current.profile.name);
+    expect(result.save.profile.breed).toBe("maltese");
     expect(result.save.coins).toBe(777);
   });
 
   it("손상 저장 데이터는 백업과 안전한 새 저장을 제공한다", () => {
     const malformed = parseImportedSave("{not-json");
-    const invalid = migrateSave({ version: 4, coins: -10 }, start);
+    const invalid = migrateSave({ version: 5, coins: -10 }, start);
 
     expect(malformed.status).toBe("corrupt");
     expect(malformed.backup).toBe("{not-json");
     expect(invalid.status).toBe("corrupt");
-    expect(invalid.save.version).toBe(4);
+    expect(invalid.save.version).toBe(5);
     expect(invalid.save.coins).toBeGreaterThanOrEqual(0);
   });
 });

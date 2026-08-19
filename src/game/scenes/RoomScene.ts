@@ -1,17 +1,45 @@
 import Phaser from "phaser";
-import type { CharacterAppearance, RoomId, WearableSlot } from "../../domain/types";
+import type { PetAppearance } from "../../domain/pet";
+import type { RoomId, WearableSlot } from "../../domain/types";
 import { gameBridge } from "../bridge/GameBridge";
-import { Keeper } from "../entities/Keeper";
+import { PetCharacter } from "../entities/PetCharacter";
 import { applyHighDpiCamera } from "../renderQuality";
 import type { OceanMode, OceanZoneId } from "../../domain/ocean";
+import { isHomeInterior } from "../../domain/home";
 
 interface RoomPresentation {
   room: RoomId;
   theme: string;
-  style: CharacterAppearance & { equipped: Record<WearableSlot, string | null> };
+  style: PetAppearance & { equipped: Record<WearableSlot, string | null> };
   reducedMotion: boolean;
   oceanMode: OceanMode;
   oceanZone: OceanZoneId;
+}
+
+interface DoorSpec {
+  id: string;
+  label: string;
+  destination: RoomId;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  approachX?: number;
+  approachY: number;
+  texture?: string;
+  color: number;
+  opensTo?: -1 | 1;
+}
+
+interface DoorView {
+  spec: DoorSpec;
+  leaf: Phaser.GameObjects.Container;
+  enterZone: Phaser.GameObjects.Zone;
+  closeHitZone: Phaser.GameObjects.Zone;
+  closeButton: Phaser.GameObjects.Container;
+  label: Phaser.GameObjects.Text;
+  objects: Phaser.GameObjects.GameObject[];
+  open: boolean;
 }
 
 export class RoomScene extends Phaser.Scene {
@@ -19,9 +47,13 @@ export class RoomScene extends Phaser.Scene {
   private theme = "sunlab";
   private background?: Phaser.GameObjects.Graphics;
   private backgroundImage?: Phaser.GameObjects.Image;
-  private keeper?: Keeper;
+  private pet?: PetCharacter;
   private fridgeHitZone?: Phaser.GameObjects.Zone;
   private ambience: Phaser.GameObjects.GameObject[] = [];
+  private doors: DoorView[] = [];
+  private pointerMarker?: Phaser.GameObjects.Container;
+  private doorInteractionAt = -1_000;
+  private enteringDoor = false;
   private reducedMotion = false;
   private oceanMode: OceanMode = "exploration";
   private oceanZone: OceanZoneId = "beach";
@@ -29,12 +61,16 @@ export class RoomScene extends Phaser.Scene {
   private lastPointer?: Phaser.Math.Vector2;
   private roomTransition?: Phaser.Time.TimerEvent;
   private cleanups: Array<() => void> = [];
-  private style: CharacterAppearance & { equipped: Record<WearableSlot, string | null> } = {
+  private style: PetAppearance & { equipped: Record<WearableSlot, string | null> } = {
     equipped: { top: "top-rookie", bottom: "bottom-sand", shoes: "shoes-deck", accessory: null },
-    skinTone: "sand",
-    hairStyle: "wave",
-    hairColor: "midnight",
-    glassesStyle: "none"
+    species: "dog",
+    breed: "maltese",
+    furColor: "snow",
+    pattern: "solid",
+    collar: "teal",
+    hat: "none",
+    accessory: "none",
+    outfit: "tee"
   };
 
   constructor() {
@@ -54,8 +90,12 @@ export class RoomScene extends Phaser.Scene {
     }
     this.backgroundImage = this.add.image(195, 350, "ocean-beach-game").setDisplaySize(390, 700).setDepth(-2).setVisible(false);
     this.background = this.add.graphics().setDepth(-1);
-    this.keeper = new Keeper(this, 195, 405, this.style).setDepth(3);
-    this.keeper.setReducedMotion(this.reducedMotion);
+    this.pet = new PetCharacter(this, 195, 405, this.style).setDepth(3);
+    this.pet.setReducedMotion(this.reducedMotion);
+    this.pointerMarker = this.add.container(195, 500, [
+      this.add.circle(0, 0, 22, 0xffffff, 0.78).setStrokeStyle(3, 0x168e8c, 0.9),
+      this.add.text(0, -1, "☝", { fontFamily: "system-ui", fontSize: "18px", resolution: Number(this.registry.get("render-scale")) || 1 }).setOrigin(0.5)
+    ]).setDepth(12).setVisible(false);
     this.fridgeHitZone = this.add.zone(65, 218, 104, 260).setDepth(6);
     this.fridgeHitZone.on("pointerdown", () => {
       if (this.room === "kitchen") gameBridge.emit("kitchen:fridge-open", undefined);
@@ -64,28 +104,31 @@ export class RoomScene extends Phaser.Scene {
 
     this.cleanups = [
       gameBridge.on("room:change", ({ room, theme }) => {
+        const roomChanged = this.room !== room;
+        const themeChanged = this.theme !== theme;
         this.room = room;
         this.theme = theme;
         this.bathDistance = 0;
-        this.transitionRoom();
+        if (roomChanged) this.transitionRoom();
+        else if (themeChanged) this.drawRoom();
       }),
       gameBridge.on("ocean:view", ({ mode, zone }) => {
         this.oceanMode = mode;
         this.oceanZone = zone;
         if (this.room === "wellness") this.drawRoom();
       }),
-      gameBridge.on("keeper:style", (style) => {
+      gameBridge.on("pet:style", (style) => {
         this.style = style;
-        this.keeper?.updateStyle(style);
+        this.pet?.updateStyle(style);
       }),
-      gameBridge.on("keeper:react", ({ action }) => {
-        this.keeper?.react(action);
+      gameBridge.on("pet:react", ({ action }) => {
+        this.pet?.react(action);
         if (action === "wash") this.bubbleBurst();
         if (action === "level") this.sparkleBurst();
       }),
       gameBridge.on("settings:motion", ({ reduced }) => {
         this.reducedMotion = reduced;
-        this.keeper?.setReducedMotion(reduced);
+        this.pet?.setReducedMotion(reduced);
         this.drawRoom();
       }),
       gameBridge.on("kitchen:fridge-open", () => {
@@ -95,11 +138,19 @@ export class RoomScene extends Phaser.Scene {
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       this.lastPointer = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
+      if (this.time.now - this.doorInteractionAt > 80) this.walkFromPointer(pointer.worldX, pointer.worldY);
     });
-    this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => this.trackBath(pointer));
+    this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+      this.trackBath(pointer);
+      if (pointer.isDown && this.room !== "bathroom" && this.lastPointer && Phaser.Math.Distance.Between(this.lastPointer.x, this.lastPointer.y, pointer.worldX, pointer.worldY) > 24) {
+        this.lastPointer.set(pointer.worldX, pointer.worldY);
+        this.walkFromPointer(pointer.worldX, pointer.worldY);
+      }
+    });
     this.input.on("pointerup", () => {
       this.lastPointer = undefined;
     });
+    this.input.keyboard?.on("keydown", (event: KeyboardEvent) => this.walkFromKeyboard(event));
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.cleanup());
   }
 
@@ -135,6 +186,9 @@ export class RoomScene extends Phaser.Scene {
   private drawRoom(): void {
     if (!this.background) return;
     this.clearAmbience();
+    this.clearDoors();
+    this.pointerMarker?.setVisible(false);
+    this.enteringDoor = false;
     this.backgroundImage?.setVisible(false);
     const g = this.background.clear();
     if (this.room === "studio") this.drawHome(g);
@@ -145,7 +199,8 @@ export class RoomScene extends Phaser.Scene {
     else if (this.room === "wardrobe") this.drawCloset(g);
     else if (this.room === "game-room") this.drawWorkout(g);
     else this.drawKitchen(g);
-    this.placeKeeper();
+    this.placePet();
+    this.setupRoomDoors();
     this.syncRoomInteractions();
   }
 
@@ -174,37 +229,216 @@ export class RoomScene extends Phaser.Scene {
   }
 
   private drawHome(g: Phaser.GameObjects.Graphics): void {
-    g.fillGradientStyle(0xf4f0e7, 0xf4f0e7, 0xe9dfcf, 0xe9dfcf, 1).fillRect(0, 0, 390, 700);
-    g.fillStyle(0xd7c29d).fillRect(0, 505, 390, 195);
-    g.fillStyle(0xf8f4ea).fillRect(0, 499, 390, 9);
-    g.lineStyle(1, 0xbca57e, 0.3);
-    for (let x = -40; x < 430; x += 62) g.lineBetween(x, 505, x + 44, 700);
+    g.fillGradientStyle(0xf5eee1, 0xfff8eb, 0xe7d8bf, 0xd8c29f, 1).fillRect(0, 0, 390, 700);
+    g.fillStyle(0xd9c69e).fillRect(0, 420, 390, 280);
+    g.fillStyle(0xfffbef).fillRect(0, 412, 390, 12);
+    g.lineStyle(1, 0xb99b70, 0.32);
+    for (let x = -110; x < 470; x += 54) g.lineBetween(x, 420, x + 86, 700);
+    for (let y = 468; y < 700; y += 48) g.lineBetween(0, y, 390, y);
 
-    // A wide picture window with a layered horizon, distant islands and moving light on the sea.
-    g.fillStyle(0xd9d3c7).fillRoundedRect(27, 62, 336, 280, 31);
-    g.fillGradientStyle(0xaedfdc, 0xc9e9e2, 0xe8e0bf, 0xe8e0bf, 1).fillRoundedRect(39, 74, 312, 256, 23);
-    g.fillStyle(0xf4cf78, 0.95).fillCircle(294, 126, 27);
-    g.fillStyle(0xffffff, 0.32).fillEllipse(123, 125, 104, 26).fillEllipse(205, 104, 70, 18);
-    g.fillStyle(0x73b9b5, 0.62).fillEllipse(96, 195, 124, 31).fillEllipse(288, 205, 148, 38);
-    g.fillStyle(0x4c8d94, 0.74).fillEllipse(88, 213, 102, 29).fillEllipse(302, 220, 127, 34);
-    g.fillStyle(0x62bbc0).fillRoundedRect(39, 211, 312, 119, 18);
-    g.fillStyle(0x8ed3cf, 0.72).fillRoundedRect(39, 235, 312, 95, 17);
-    g.fillStyle(0xd5f0e8, 0.36).fillEllipse(192, 246, 332, 64);
-    g.lineStyle(2, 0xffffff, 0.52).beginPath().moveTo(58, 264).lineTo(108, 255).lineTo(158, 269).lineTo(214, 258).lineTo(268, 273).lineTo(333, 260).strokePath();
-    g.lineStyle(8, 0xf9f5ec, 0.96).strokeRoundedRect(27, 62, 336, 280, 31);
-    g.lineStyle(5, 0xf9f5ec, 0.9).lineBetween(195, 68, 195, 336).lineBetween(32, 207, 358, 207);
-    g.lineStyle(1.5, 0xffffff, 0.42).lineBetween(49, 90, 49, 315).lineBetween(341, 90, 341, 315);
+    g.fillStyle(0xe8dcc7).fillRoundedRect(8, 52, 374, 361, 18);
+    g.fillStyle(0xfffbf0, 0.7).fillRoundedRect(16, 60, 358, 344, 14);
+    g.fillStyle(this.themeAccent(), 0.1).fillRoundedRect(19, 64, 352, 336, 12);
+    g.fillStyle(0xc49b70, 0.24).fillRect(0, 395, 390, 22);
 
-    // Warm interior details and floor texture.
-    g.fillStyle(this.themeAccent(), 0.2).fillEllipse(195, 584, 235, 72);
-    g.fillStyle(0xffffff, 0.18).fillTriangle(52, 342, 176, 342, 116, 650);
-    g.fillStyle(0xb68e66).fillRoundedRect(292, 431, 67, 10, 5).fillRoundedRect(302, 440, 8, 92, 4).fillRoundedRect(341, 440, 8, 92, 4);
-    g.fillStyle(0xe6c77e).fillCircle(326, 415, 20);
-    g.fillStyle(0xefd8b0).fillRoundedRect(22, 475, 61, 69, 15).fillRoundedRect(313, 478, 53, 70, 14);
-    g.fillStyle(0xd0ad7d).fillRoundedRect(26, 489, 53, 13, 6).fillRoundedRect(317, 491, 45, 12, 6);
-    g.fillStyle(0x78958b).fillRoundedRect(91, 377, 58, 10, 5);
-    g.fillStyle(0xe8be73).fillRoundedRect(98, 354, 12, 22, 3).fillRoundedRect(113, 348, 10, 28, 3).fillRoundedRect(126, 357, 14, 19, 3);
-    this.addHomeAmbience();
+    // Furniture is kept low so every physical door remains readable and reachable.
+    g.fillStyle(0x9bb7a4).fillRoundedRect(111, 424, 168, 64, 22);
+    g.fillStyle(0xc8dbca).fillRoundedRect(123, 412, 64, 38, 18).fillRoundedRect(202, 412, 64, 38, 18);
+    g.fillStyle(0x6f8f82, 0.24).fillRoundedRect(128, 480, 12, 40, 5).fillRoundedRect(250, 480, 12, 40, 5);
+    g.fillStyle(0xb8855d).fillRoundedRect(146, 505, 98, 12, 6).fillRoundedRect(154, 516, 8, 38, 4).fillRoundedRect(228, 516, 8, 38, 4);
+    g.fillStyle(0xf2d58d).fillEllipse(195, 506, 74, 20);
+    g.fillStyle(this.themeAccent(), 0.2).fillEllipse(195, 585, 250, 82);
+    g.fillStyle(0xffffff, 0.18).fillTriangle(145, 60, 257, 60, 318, 670);
+
+    for (let index = 0; index < 7; index += 1) {
+      const dust = this.add.circle(44 + index * 49, 155 + (index % 3) * 83, 1.5 + index % 2, 0xffffff, 0.28).setDepth(1);
+      this.ambience.push(dust);
+      if (!this.reducedMotion) this.tweens.add({ targets: dust, y: dust.y - 18, x: dust.x + (index % 2 ? 5 : -5), alpha: 0.08, duration: 2600 + index * 230, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    }
+  }
+
+  private setupRoomDoors(): void {
+    const homeDoors: DoorSpec[] = [
+      { id: "kitchen", label: "주방", destination: "kitchen", x: 37, y: 242, width: 54, height: 158, approachX: 70, approachY: 398, texture: "kitchen-game", color: 0xd9a96e, opensTo: -1 },
+      { id: "bathroom", label: "욕실", destination: "bathroom", x: 98, y: 242, width: 54, height: 158, approachX: 110, approachY: 398, texture: "bathroom-game", color: 0x8fc6bf, opensTo: 1 },
+      { id: "ocean", label: "현관 · Ocean", destination: "wellness", x: 195, y: 223, width: 120, height: 240, approachY: 404, texture: "ocean-beach-game", color: 0x4f9ea4, opensTo: -1 },
+      { id: "bedroom", label: "침실", destination: "bedroom", x: 292, y: 242, width: 54, height: 158, approachX: 280, approachY: 398, texture: "bedroom-game", color: 0x7f91b8, opensTo: -1 },
+      { id: "wardrobe", label: "옷장", destination: "wardrobe", x: 353, y: 242, width: 54, height: 158, approachX: 320, approachY: 398, texture: "wardrobe-game", color: 0xb7875f, opensTo: 1 }
+    ];
+    if (this.room === "studio") {
+      homeDoors.forEach((door) => this.createDoor(door));
+      return;
+    }
+
+    if (isHomeInterior(this.room)) {
+      this.createDoor({ id: `${this.room}-home`, label: "거실로", destination: "studio", x: 344, y: 260, width: 72, height: 192, approachX: 304, approachY: 412, color: 0x5d8f88, opensTo: 1 });
+      return;
+    }
+
+    if (this.room === "wellness") {
+      this.createDoor({ id: "ocean-home", label: "집으로", destination: "studio", x: 42, y: 278, width: 64, height: 166, approachX: 88, approachY: 410, color: 0xf1d89a, opensTo: -1 });
+      return;
+    }
+
+    if (this.room === "game-room") {
+      this.createDoor({ id: "workout-home", label: "정원문 · Home", destination: "studio", x: 344, y: 270, width: 72, height: 184, approachX: 302, approachY: 418, color: 0x4d9273, opensTo: 1 });
+    }
+  }
+
+  private createDoor(spec: DoorSpec): void {
+    const objects: Phaser.GameObjects.GameObject[] = [];
+    const opening = this.add.rectangle(spec.x, spec.y, spec.width, spec.height, 0x173847, 0.92).setDepth(1);
+    objects.push(opening);
+    if (spec.texture) {
+      const preview = this.add.image(spec.x, spec.y, spec.texture).setDisplaySize(spec.width - 8, spec.height - 8).setDepth(1.2).setAlpha(0.92);
+      objects.push(preview);
+    } else {
+      const preview = this.add.rectangle(spec.x, spec.y, spec.width - 8, spec.height - 8, 0xf5e6c8).setDepth(1.2);
+      const horizon = this.add.rectangle(spec.x, spec.y - 12, spec.width - 10, 42, 0x8ed3cf, 0.8).setDepth(1.3);
+      objects.push(preview, horizon);
+    }
+
+    const frame = this.add.graphics().setDepth(2);
+    frame.lineStyle(9, 0xfffbef, 0.98).strokeRoundedRect(spec.x - spec.width / 2 - 4, spec.y - spec.height / 2 - 5, spec.width + 8, spec.height + 10, 7);
+    frame.lineStyle(2, 0x6c5743, 0.42).strokeRoundedRect(spec.x - spec.width / 2, spec.y - spec.height / 2, spec.width, spec.height, 4);
+    objects.push(frame);
+
+    const leaf = this.add.container(spec.x, spec.y, [
+      this.add.rectangle(0, 0, spec.width - 8, spec.height - 8, spec.color).setStrokeStyle(2, 0xffffff, 0.58),
+      this.add.rectangle(0, -spec.height * 0.22, spec.width - 20, spec.height * 0.31, 0xffffff, 0.11).setStrokeStyle(1, 0xffffff, 0.22),
+      this.add.rectangle(0, spec.height * 0.2, spec.width - 20, spec.height * 0.28, 0x173847, 0.06).setStrokeStyle(1, 0xffffff, 0.17),
+      this.add.circle((spec.width / 2 - 15) * -(spec.opensTo ?? 1), 3, Math.max(3, spec.width * 0.055), 0xf6d677).setStrokeStyle(1, 0x694e31, 0.55)
+    ]).setDepth(4);
+    objects.push(leaf);
+
+    const label = this.add.text(spec.x, spec.y + spec.height / 2 + 13, `${spec.label} · 열기`, {
+      fontFamily: "system-ui",
+      fontSize: spec.width > 80 ? "9px" : "7px",
+      fontStyle: "bold",
+      color: "#ffffff",
+      backgroundColor: "#173d48d9",
+      padding: { x: 7, y: 4 },
+      resolution: Number(this.registry.get("render-scale")) || 1
+    }).setOrigin(0.5).setDepth(6);
+    objects.push(label);
+
+    const enterZone = this.add.zone(spec.x, spec.y, spec.width, spec.height).setDepth(8).setInteractive({ useHandCursor: true });
+    const closeIcon = this.add.text(0, 0, "×", { fontFamily: "system-ui", fontSize: "16px", fontStyle: "bold", color: "#ffffff", resolution: Number(this.registry.get("render-scale")) || 1 }).setOrigin(0.5);
+    const closeButton = this.add.container(spec.x + spec.width / 2 - 12, spec.y - spec.height / 2 + 12, [this.add.circle(0, 0, 14, 0x173847, 0.9), closeIcon]).setSize(34, 34).setDepth(10).setVisible(false);
+    const closeHitZone = this.add.zone(closeButton.x, closeButton.y, 36, 36).setDepth(11);
+    objects.push(enterZone, closeButton, closeHitZone);
+
+    const door: DoorView = { spec, leaf, enterZone, closeHitZone, closeButton, label, objects, open: false };
+    enterZone.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      this.doorInteractionAt = this.time.now;
+      if (door.open) this.enterDoor(door);
+      else this.openDoor(door);
+    });
+    closeHitZone.on("pointerdown", (_pointer: Phaser.Input.Pointer, _localX: number, _localY: number, event: Phaser.Types.Input.EventData) => {
+      event.stopPropagation();
+      this.doorInteractionAt = this.time.now;
+      if (door.open) this.closeDoor(door);
+    });
+    this.doors.push(door);
+  }
+
+  private openDoor(door: DoorView): void {
+    if (door.open || this.enteringDoor || !this.pet) return;
+    this.doors.filter((item) => item !== door && item.open).forEach((item) => this.closeDoor(item, true));
+    door.open = true;
+    door.label.setText(`${door.spec.label} · 들어가기`);
+    door.closeButton.setVisible(true);
+    door.closeHitZone.setInteractive({ useHandCursor: true });
+    this.showPointerMarker(door.spec.approachX ?? door.spec.x, door.spec.approachY);
+    this.pet.walkTo(door.spec.approachX ?? door.spec.x, door.spec.approachY);
+    const direction = door.spec.opensTo ?? 1;
+    this.tweens.add({
+      targets: door.leaf,
+      x: door.spec.x + direction * door.spec.width * 0.43,
+      scaleX: 0.14,
+      duration: this.reducedMotion ? 1 : 280,
+      ease: "Sine.easeInOut"
+    });
+  }
+
+  private closeDoor(door: DoorView, immediate = false): void {
+    if (!door.open && !immediate) return;
+    door.open = false;
+    door.closeButton.setVisible(false);
+    door.closeHitZone.disableInteractive();
+    door.label.setText(`${door.spec.label} · 열기`);
+    this.tweens.killTweensOf(door.leaf);
+    if (immediate) {
+      door.leaf.setPosition(door.spec.x, door.spec.y).setScale(1);
+      return;
+    }
+    this.tweens.add({ targets: door.leaf, x: door.spec.x, scaleX: 1, duration: this.reducedMotion ? 1 : 230, ease: "Sine.easeInOut" });
+  }
+
+  private enterDoor(door: DoorView): void {
+    if (!door.open || this.enteringDoor || !this.pet) return;
+    this.enteringDoor = true;
+    const targetY = door.spec.y + door.spec.height * 0.28;
+    const walkDuration = Phaser.Math.Clamp(this.pet.distanceTo(door.spec.x, targetY) * 3.2, 180, 900);
+    this.pet.walkTo(door.spec.x, targetY, () => undefined);
+    this.time.delayedCall(walkDuration, () => {
+      if (!this.enteringDoor || !this.pet || !door.leaf.active) return;
+      this.pet.setDepth(1.5);
+      this.tweens.add({
+        targets: this.pet,
+        y: door.spec.y + 8,
+        scaleX: 0.16,
+        scaleY: 0.16,
+        alpha: 0,
+        duration: this.reducedMotion ? 1 : 300,
+        ease: "Sine.easeIn",
+        onComplete: () => gameBridge.emit("home:door-enter", { room: door.spec.destination })
+      });
+    });
+  }
+
+  private walkFromPointer(x: number, y: number): void {
+    if (!this.pet || this.enteringDoor || !isHomeInterior(this.room)) return;
+    const minY = this.room === "studio" ? 430 : 350;
+    const targetX = Phaser.Math.Clamp(x, 40, 350);
+    const targetY = Phaser.Math.Clamp(y, minY, 555);
+    this.showPointerMarker(targetX, targetY);
+    this.pet.walkTo(targetX, targetY);
+  }
+
+  private walkFromKeyboard(event: KeyboardEvent): void {
+    if (!this.pet || this.enteringDoor || !isHomeInterior(this.room)) return;
+    const movement: Record<string, [number, number]> = {
+      ArrowLeft: [-42, 0], KeyA: [-42, 0], ArrowRight: [42, 0], KeyD: [42, 0], ArrowUp: [0, -34], KeyW: [0, -34], ArrowDown: [0, 34], KeyS: [0, 34]
+    };
+    const direction = movement[event.code];
+    if (!direction) return;
+    event.preventDefault();
+    const minY = this.room === "studio" ? 430 : 350;
+    const targetX = Phaser.Math.Clamp(this.pet.x + direction[0], 40, 350);
+    const targetY = Phaser.Math.Clamp(this.pet.y + direction[1], minY, 555);
+    this.showPointerMarker(targetX, targetY);
+    this.pet.walkTo(targetX, targetY);
+  }
+
+  private showPointerMarker(x: number, y: number): void {
+    if (!this.pointerMarker) return;
+    this.tweens.killTweensOf(this.pointerMarker);
+    this.pointerMarker.setPosition(x, y).setScale(0.72).setAlpha(1).setVisible(true);
+    this.tweens.add({ targets: this.pointerMarker, scale: 1.08, alpha: 0, duration: 540, ease: "Quad.easeOut", onComplete: () => this.pointerMarker?.setVisible(false) });
+  }
+
+  private clearDoors(): void {
+    for (const door of this.doors) {
+      door.enterZone.removeAllListeners();
+      door.closeHitZone.removeAllListeners();
+      door.objects.forEach((object) => {
+        this.tweens.killTweensOf(object);
+        object.destroy();
+      });
+    }
+    this.doors = [];
   }
 
   private drawKitchen(g: Phaser.GameObjects.Graphics): void {
@@ -382,47 +616,6 @@ export class RoomScene extends Phaser.Scene {
     }
   }
 
-  private addHomeAmbience(): void {
-    const leftPlant = this.drawIndoorPlant(53, 493, 0.88, -1, 0x4f9272, 0x79b88b);
-    const rightPlant = this.drawIndoorPlant(340, 496, 0.82, 1, 0x397f69, 0x6fb283);
-
-    const leftCurtain = this.add.graphics().setPosition(29, 72).setDepth(1).setAlpha(0.46);
-    leftCurtain.fillStyle(0xfffdf5, 0.72).fillRoundedRect(0, 0, 22, 250, 11);
-    leftCurtain.fillStyle(0xc7ded8, 0.2).fillRoundedRect(7, 0, 5, 250, 3).fillTriangle(19, 0, 42, 0, 22, 176);
-    const rightCurtain = this.add.graphics().setPosition(339, 72).setDepth(1).setAlpha(0.46);
-    rightCurtain.fillStyle(0xfffdf5, 0.72).fillRoundedRect(0, 0, 22, 250, 11);
-    rightCurtain.fillStyle(0xc7ded8, 0.2).fillRoundedRect(9, 0, 5, 250, 3).fillTriangle(3, 0, -20, 0, 0, 176);
-    this.ambience.push(leftPlant, rightPlant, leftCurtain, rightCurtain);
-
-    for (let index = 0; index < 4; index += 1) {
-      const wave = this.add.graphics().setPosition(65 + index * 73, 237 + (index % 2) * 31).setDepth(1).setAlpha(0.38 + index * 0.08);
-      wave.lineStyle(2, 0xffffff, 0.88).beginPath().moveTo(0, 0).lineTo(18, -2).lineTo(37, 1).lineTo(55, -1).strokePath();
-      this.ambience.push(wave);
-      if (!this.reducedMotion) this.tweens.add({ targets: wave, x: wave.x + 14, alpha: 0.72, duration: 2200 + index * 320, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-    }
-
-    if (!this.reducedMotion) {
-      this.tweens.add({ targets: leftPlant, angle: 1.8, x: leftPlant.x + 2, duration: 2600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-      this.tweens.add({ targets: rightPlant, angle: -1.5, x: rightPlant.x - 2, duration: 3100, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-      this.tweens.add({ targets: leftCurtain, x: leftCurtain.x + 3, alpha: 0.54, duration: 3600, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-      this.tweens.add({ targets: rightCurtain, x: rightCurtain.x - 3, alpha: 0.54, duration: 3900, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
-    }
-  }
-
-  private drawIndoorPlant(x: number, y: number, scale: number, direction: -1 | 1, dark: number, light: number): Phaser.GameObjects.Graphics {
-    const plant = this.add.graphics().setPosition(x, y).setScale(scale).setDepth(1);
-    plant.lineStyle(3, dark, 0.92).beginPath().moveTo(0, 0).lineTo(direction * 2, -92).moveTo(0, -24).lineTo(direction * -24, -68).moveTo(direction * 1, -42).lineTo(direction * 29, -89).moveTo(direction * 1, -66).lineTo(direction * -19, -112).moveTo(direction * 1, -76).lineTo(direction * 22, -130).strokePath();
-    const leaves: Array<[number, number, number, number, number]> = [
-      [-24, -70, 42, 19, 0], [25, -90, 45, 20, 1], [-18, -113, 38, 18, 1], [20, -130, 42, 19, 0], [2, -95, 35, 18, 0], [30, -59, 37, 17, 1], [-30, -48, 34, 16, 0]
-    ];
-    leaves.forEach(([leafX, leafY, width, height, alternate]) => {
-      plant.fillStyle(alternate ? light : dark).fillEllipse(direction * leafX, leafY, width, height);
-      plant.fillStyle(0xffffff, 0.13).fillEllipse(direction * (leafX - 4), leafY - 3, width * 0.42, height * 0.26);
-    });
-    plant.fillStyle(light).fillEllipse(0, -142, 30, 17);
-    return plant;
-  }
-
   private clearAmbience(): void {
     this.ambience.forEach((object) => {
       this.tweens.killTweensOf(object);
@@ -437,19 +630,19 @@ export class RoomScene extends Phaser.Scene {
     g.fillStyle(0x173d48).fillCircle(x + 11 * direction, y - 3, 2);
   }
 
-  private placeKeeper(): void {
-    if (!this.keeper) return;
+  private placePet(): void {
+    if (!this.pet) return;
     const placements: Record<RoomId, { x: number; y: number; scale: number; pose: "standing" | "sleeping" }> = {
-      studio: { x: 195, y: 408, scale: 1.13, pose: "standing" },
-      kitchen: { x: 202, y: 420, scale: 0.96, pose: "standing" },
+      studio: { x: 195, y: 535, scale: 0.54, pose: "standing" },
+      kitchen: { x: 205, y: 500, scale: 0.5, pose: "standing" },
       wellness: { x: 306, y: 440, scale: 0.6, pose: "standing" },
-      bathroom: { x: 205, y: 416, scale: 0.92, pose: "standing" },
-      bedroom: { x: 211, y: 370, scale: 0.65, pose: "sleeping" },
-      wardrobe: { x: 194, y: 424, scale: 0.94, pose: "standing" },
-      "game-room": { x: 188, y: 418, scale: 0.96, pose: "standing" },
-      shop: { x: 202, y: 420, scale: 0.96, pose: "standing" }
+      bathroom: { x: 205, y: 500, scale: 0.5, pose: "standing" },
+      bedroom: { x: 205, y: 492, scale: 0.48, pose: "standing" },
+      wardrobe: { x: 194, y: 505, scale: 0.5, pose: "standing" },
+      "game-room": { x: 188, y: 475, scale: 0.62, pose: "standing" },
+      shop: { x: 202, y: 500, scale: 0.5, pose: "standing" }
     };
-    this.keeper.setVisible(true).setAngle(0);
+    this.pet.setVisible(true).setAngle(0).setAlpha(1).setDepth(3);
     if (this.room === "wellness") {
       const oceanPlacements: Record<OceanZoneId, { x: number; y: number; scale: number; angle: number }> = {
         beach: { x: 286, y: 392, scale: 0.52, angle: 0 },
@@ -459,12 +652,12 @@ export class RoomScene extends Phaser.Scene {
         deepsea: { x: 194, y: 334, scale: 0.33, angle: 0 }
       };
       const oceanPlacement = this.oceanMode === "coastal-road" ? { x: 210, y: 390, scale: 0.45, angle: 0 } : oceanPlacements[this.oceanZone];
-      this.keeper.setRoomPresentation(oceanPlacement.x, oceanPlacement.y, oceanPlacement.scale, "standing");
-      this.keeper.setAngle(oceanPlacement.angle);
+      this.pet.setRoomPresentation(oceanPlacement.x, oceanPlacement.y, oceanPlacement.scale, "standing");
+      this.pet.setAngle(oceanPlacement.angle);
       return;
     }
     const placement = placements[this.room];
-    this.keeper.setRoomPresentation(placement.x, placement.y, placement.scale, placement.pose);
+    this.pet.setRoomPresentation(placement.x, placement.y, placement.scale, placement.pose);
   }
 
   private themeAccent(): number {
@@ -501,11 +694,13 @@ export class RoomScene extends Phaser.Scene {
 
   private cleanup(): void {
     this.clearAmbience();
+    this.clearDoors();
     this.cleanups.forEach((cleanup) => cleanup());
     this.cleanups = [];
     this.roomTransition?.destroy();
     this.roomTransition = undefined;
     this.fridgeHitZone?.removeAllListeners();
     this.input.removeAllListeners();
+    this.input.keyboard?.removeAllListeners();
   }
 }

@@ -1,21 +1,17 @@
 import Phaser from "phaser";
-import { hairColor, skinColor } from "../../domain/appearance";
 import { ITEM_BY_ID } from "../../domain/catalog";
-import type { GlassesStyle, HairStyle, MiniGameResult, SkinTone, HairColor } from "../../domain/types";
-import { OCEAN_GAME_BY_ID } from "../../domain/ocean";
+import { OUTFIT_COLORS, breedDefinition, furColorValue, petAccentColor, type PetProfile } from "../../domain/pet";
+import type { MiniGameResult } from "../../domain/types";
+import { OCEAN_GAME_BY_ID, OCEAN_RUN_CHAPTERS, type OceanRunChapterId } from "../../domain/ocean";
 import { gameBridge } from "../bridge/GameBridge";
 import { applyHighDpiCamera } from "../renderQuality";
 
 type GameId = MiniGameResult["gameId"];
 
-interface AthleteProfile {
-  name: string;
-  skin: number;
-  hair: number;
-  shirt: number;
-  pants: number;
-  hairStyle: HairStyle;
-  glassesStyle: GlassesStyle;
+interface PetRenderProfile extends PetProfile {
+  fur: number;
+  accent: number;
+  outfitColor: number;
 }
 
 export class MiniGameScene extends Phaser.Scene {
@@ -45,8 +41,8 @@ export class MiniGameScene extends Phaser.Scene {
   private sportBall?: Phaser.GameObjects.Arc;
   private sportHitTarget?: Phaser.GameObjects.Arc;
   private sportHitGlow?: Phaser.GameObjects.Arc;
-  private playerAthlete?: Phaser.GameObjects.Container;
-  private computerAthlete?: Phaser.GameObjects.Container;
+  private playerPet?: Phaser.GameObjects.Container;
+  private computerPet?: Phaser.GameObjects.Container;
   private sportPhase: "waiting" | "to-player" | "to-computer" | "football-ready" | "football-shot" = "waiting";
   private sportVelocity = new Phaser.Math.Vector2();
   private nextSportServeAt = 0;
@@ -57,12 +53,25 @@ export class MiniGameScene extends Phaser.Scene {
   private swimmer?: Phaser.GameObjects.Container;
   private swimTarget = new Phaser.Math.Vector2(195, 365);
   private catches = 0;
+  private oceanChapterIndex = 0;
+  private oceanDistance = 0;
+  private oceanJumping = false;
+  private oceanTransitioning = false;
+  private oceanInvulnerableUntil = 0;
+  private oceanLastProgressAt = 0;
+  private oceanGear = { oxygenTank: false, submarine: false };
+  private oceanEnvironment: Phaser.GameObjects.GameObject[] = [];
+  private oceanAmbient: Phaser.GameObjects.Container[] = [];
+  private oceanBackground?: Phaser.GameObjects.Image;
+  private oceanChapterText?: Phaser.GameObjects.Text;
+  private readonly oceanRunnerY = 430;
+  private readonly oceanHorizonY = 228;
 
   constructor() {
     super("minigame");
   }
 
-  init(data: { id?: GameId }): void {
+  init(data: { id?: GameId; oceanGear?: { oxygenTank: boolean; submarine: boolean } }): void {
     this.gameId = data.id ?? "bubble-focus";
     this.score = 0;
     this.combo = 0;
@@ -78,8 +87,8 @@ export class MiniGameScene extends Phaser.Scene {
     this.sportBall = undefined;
     this.sportHitTarget = undefined;
     this.sportHitGlow = undefined;
-    this.playerAthlete = undefined;
-    this.computerAthlete = undefined;
+    this.playerPet = undefined;
+    this.computerPet = undefined;
     this.sportPhase = "waiting";
     this.sportVelocity.set(0, 0);
     this.nextSportServeAt = 0;
@@ -90,12 +99,23 @@ export class MiniGameScene extends Phaser.Scene {
     this.swimmer = undefined;
     this.swimTarget.set(195, 365);
     this.catches = 0;
+    this.oceanChapterIndex = 0;
+    this.oceanDistance = 0;
+    this.oceanJumping = false;
+    this.oceanTransitioning = false;
+    this.oceanInvulnerableUntil = 0;
+    this.oceanLastProgressAt = 0;
+    this.oceanGear = data.oceanGear ?? { oxygenTank: false, submarine: false };
+    this.oceanEnvironment = [];
+    this.oceanAmbient = [];
+    this.oceanBackground = undefined;
+    this.oceanChapterText = undefined;
   }
 
   create(): void {
     const renderScale = applyHighDpiCamera(this);
     this.startedAt = this.time.now;
-    const darkGame = this.gameId === "current-run" || this.gameId === "reef-surf" || this.gameId === "cave-sonar" || this.gameId === "deepsea-descent";
+    const darkGame = this.gameId === "current-run" || this.gameId === "ocean-run" || this.gameId === "reef-surf" || this.gameId === "cave-sonar" || this.gameId === "deepsea-descent";
     this.cameras.main.setBackgroundColor(darkGame ? "#102d4d" : "#dff5ec");
     this.add
       .text(20, 18, this.title(), { fontFamily: "system-ui", fontSize: "17px", fontStyle: "bold", color: darkGame ? "#e6fff8" : "#174b57", resolution: renderScale })
@@ -115,6 +135,7 @@ export class MiniGameScene extends Phaser.Scene {
     if (this.gameId === "bubble-focus") this.createBubbleFocus();
     if (this.gameId === "current-run") this.createCurrentRun();
     if (this.gameId === "reef-memory") this.createReefMemory();
+    if (this.gameId === "ocean-run") this.createOceanRun();
     if (this.gameId === "beach-volleyball" || this.gameId === "beach-pingpong" || this.gameId === "beach-football") this.createBeachSport();
     if (this.gameId === "open-water-catch") this.createOpenWaterCatch();
     if (this.gameId === "reef-surf" || this.gameId === "deepsea-descent") this.createCurrentRun();
@@ -124,7 +145,7 @@ export class MiniGameScene extends Phaser.Scene {
     this.cleanupBridge = [
       gameBridge.on("minigame:pause", () => this.scene.pause()),
       gameBridge.on("minigame:resume", () => this.scene.resume()),
-      gameBridge.on("minigame:restart", () => this.scene.restart({ id: this.gameId })),
+      gameBridge.on("minigame:restart", () => this.scene.restart({ id: this.gameId, oceanGear: this.oceanGear })),
       gameBridge.on("minigame:move", ({ direction }) => this.moveLane(direction)),
       gameBridge.on("minigame:action", () => this.performPrimaryAction()),
       gameBridge.on("minigame:demo-finish", () => {
@@ -140,6 +161,7 @@ export class MiniGameScene extends Phaser.Scene {
     const remaining = Math.max(0, Math.ceil((this.durationMs - (time - this.startedAt)) / 1000));
     this.timerText?.setText(String(remaining));
     if (this.gameId === "current-run" || this.gameId === "reef-surf" || this.gameId === "deepsea-descent") this.updateCurrentRun(delta, time);
+    if (this.gameId === "ocean-run") this.updateOceanRun(delta, time);
     if (this.gameId === "beach-volleyball" || this.gameId === "beach-pingpong") this.updateRallySport(delta);
     if (this.gameId === "beach-football") this.updateFootball(time);
     if (this.gameId === "open-water-catch") this.updateOpenWater(delta);
@@ -177,9 +199,9 @@ export class MiniGameScene extends Phaser.Scene {
       for (let x = 28; x < 366; x += 26) this.add.line(0, 0, x, 337, x, 403, 0x97b5a7, 0.55).setOrigin(0).setDepth(4);
     }
 
-    const opponent = this.randomOpponentProfile();
-    this.computerAthlete = this.createAthlete(195, pingPong ? 272 : 278, pingPong ? 0.72 : 0.78, opponent, true).setDepth(pingPong ? 2 : 4);
-    this.playerAthlete = this.createAthlete(195, pingPong ? 550 : 556, pingPong ? 0.9 : 0.94, this.playerProfile(), false).setDepth(8);
+    const opponent = this.randomPetProfile();
+    this.computerPet = this.createSportPet(195, pingPong ? 272 : 278, pingPong ? 0.72 : 0.78, opponent, true).setDepth(pingPong ? 2 : 4);
+    this.playerPet = this.createSportPet(195, pingPong ? 550 : 556, pingPong ? 0.9 : 0.94, this.playerPetProfile(), false).setDepth(8);
     this.sportBall = this.add.circle(195, pingPong ? 305 : 310, pingPong ? 9 : 15, pingPong ? 0xffffff : 0xffc85f)
       .setStrokeStyle(3, pingPong ? 0xffbb5b : 0xffffff, 0.94)
       .setDepth(13)
@@ -219,11 +241,11 @@ export class MiniGameScene extends Phaser.Scene {
     const pingPong = this.gameId === "beach-pingpong";
     this.combo = 0;
     this.sportPhase = "to-player";
-    this.sportBall.setPosition(this.computerAthlete?.x ?? 195, pingPong ? 305 : 300).setVisible(true);
+    this.sportBall.setPosition(this.computerPet?.x ?? 195, pingPong ? 305 : 300).setVisible(true);
     const targetX = Phaser.Math.Between(pingPong ? 132 : 110, pingPong ? 258 : 280);
     const speed = pingPong ? 285 : 252;
     this.sportVelocity.set((targetX - this.sportBall.x) / 0.9, speed);
-    this.swingAthlete(this.computerAthlete, true);
+    this.swingPet(this.computerPet, true);
     this.infoText?.setText("COM 서브 · 공이 빛나는 순간 공을 터치하세요!");
   }
 
@@ -244,16 +266,16 @@ export class MiniGameScene extends Phaser.Scene {
     const targetX = Phaser.Math.Between(115, 275);
     const speed = Math.min(390, (this.gameId === "beach-pingpong" ? 300 : 270) + this.combo * 12);
     this.sportVelocity.set((targetX - this.sportBall.x) / 0.78, -speed);
-    this.swingAthlete(this.playerAthlete, false);
-    this.tweens.add({ targets: this.playerAthlete, x: Phaser.Math.Clamp(this.sportBall.x, 132, 258), duration: 130, yoyo: true, ease: "Sine.easeOut" });
+    this.swingPet(this.playerPet, false);
+    this.tweens.add({ targets: this.playerPet, x: Phaser.Math.Clamp(this.sportBall.x, 132, 258), duration: 130, yoyo: true, ease: "Sine.easeOut" });
     this.infoText?.setText(`${this.combo} 랠리 · 정확한 리턴 +${points}`);
     this.updateSportScore();
   }
 
   private computerReturn(): void {
     if (!this.sportBall) return;
-    this.swingAthlete(this.computerAthlete, true);
-    this.tweens.add({ targets: this.computerAthlete, x: Phaser.Math.Clamp(this.sportBall.x, 132, 258), duration: 120, yoyo: true, ease: "Sine.easeOut" });
+    this.swingPet(this.computerPet, true);
+    this.tweens.add({ targets: this.computerPet, x: Phaser.Math.Clamp(this.sportBall.x, 132, 258), duration: 120, yoyo: true, ease: "Sine.easeOut" });
     const returnChance = this.combo < 2 ? 1 : Math.max(0.52, this.computerSkill - this.combo * 0.025);
     if (Math.random() > returnChance) {
       this.endRally(true, "COM이 놓쳤어요. 내 득점!");
@@ -288,9 +310,9 @@ export class MiniGameScene extends Phaser.Scene {
     this.add.rectangle(195, 270, 220, 112, 0xffffff, 0.08).setStrokeStyle(6, 0xffffff, 0.9).setDepth(3);
     for (let x = 92; x <= 298; x += 26) this.add.line(0, 0, x, 214, x, 326, 0xffffff, 0.24).setOrigin(0).setDepth(2);
     for (let y = 228; y <= 318; y += 22) this.add.line(0, 0, 88, y, 302, y, 0xffffff, 0.22).setOrigin(0).setDepth(2);
-    const opponent = this.randomOpponentProfile();
-    this.computerAthlete = this.createAthlete(195, 332, 0.78, opponent, true).setDepth(5);
-    this.playerAthlete = this.createAthlete(195, 540, 0.92, this.playerProfile(), false).setDepth(8);
+    const opponent = this.randomPetProfile();
+    this.computerPet = this.createSportPet(195, 332, 0.78, opponent, true).setDepth(5);
+    this.playerPet = this.createSportPet(195, 540, 0.92, this.playerPetProfile(), false).setDepth(8);
     this.sportBall = this.add.circle(195, 502, 17, 0xfaf8ef).setStrokeStyle(3, 0x33494e, 0.55).setDepth(12);
     this.add.polygon(195, 502, [-7, -4, 0, -10, 8, -4, 5, 5, -5, 5], 0x405154).setDepth(13);
     this.sportHitTarget = this.add.circle(195, 502, 37, 0xffffff, 0.001).setInteractive({ useHandCursor: true }).setDepth(14);
@@ -315,10 +337,10 @@ export class MiniGameScene extends Phaser.Scene {
     const shotX = this.timingObject.x;
     const shotY = this.timingObject.y;
     const guessedCorrectly = Math.random() < this.computerSkill;
-    const keeperX = guessedCorrectly ? Phaser.Math.Clamp(shotX + Phaser.Math.Between(-24, 24), 112, 278) : Phaser.Utils.Array.GetRandom([108, 195, 282]);
-    const saved = Math.abs(keeperX - shotX) < 45 && guessedCorrectly;
-    this.swingAthlete(this.playerAthlete, false, true);
-    this.tweens.add({ targets: this.computerAthlete, x: keeperX, angle: (keeperX - 195) / 5, duration: 420, ease: "Sine.easeOut" });
+    const defenderX = guessedCorrectly ? Phaser.Math.Clamp(shotX + Phaser.Math.Between(-24, 24), 112, 278) : Phaser.Utils.Array.GetRandom([108, 195, 282]);
+    const saved = Math.abs(defenderX - shotX) < 45 && guessedCorrectly;
+    this.swingPet(this.playerPet, false, true);
+    this.tweens.add({ targets: this.computerPet, x: defenderX, angle: (defenderX - 195) / 5, duration: 420, ease: "Sine.easeOut" });
     this.tweens.add({
       targets: this.sportBall,
       x: shotX,
@@ -349,12 +371,13 @@ export class MiniGameScene extends Phaser.Scene {
   private resetFootballShot(): void {
     this.sportBall?.setPosition(195, 502).setScale(1);
     this.sportHitTarget?.setPosition(195, 502);
-    this.computerAthlete?.setPosition(195, 332).setAngle(0);
-    this.playerAthlete?.setPosition(195, 540).setAngle(0);
+    this.computerPet?.setPosition(195, 332).setAngle(0);
+    this.playerPet?.setPosition(195, 540).setAngle(0);
     this.sportPhase = "football-ready";
   }
 
   private performPrimaryAction(): void {
+    if (this.gameId === "ocean-run") this.jumpOceanRunner();
     if (this.gameId === "beach-pingpong" || this.gameId === "beach-volleyball") this.attemptRallyHit();
     if (this.gameId === "beach-football") this.attemptFootballShot();
   }
@@ -370,88 +393,91 @@ export class MiniGameScene extends Phaser.Scene {
     });
   }
 
-  private playerProfile(): AthleteProfile {
+  private playerPetProfile(): PetRenderProfile {
     const presentation = this.registry.get("initial-presentation") as {
-      style?: { skinTone?: SkinTone; hairStyle?: HairStyle; hairColor?: HairColor; glassesStyle?: GlassesStyle; equipped?: { top?: string | null; bottom?: string | null } };
+      style?: Partial<PetProfile> & { equipped?: { top?: string | null; accessory?: string | null } };
     } | undefined;
     const style = presentation?.style;
     const topColor = style?.equipped?.top ? ITEM_BY_ID[style.equipped.top]?.color : undefined;
-    const bottomColor = style?.equipped?.bottom ? ITEM_BY_ID[style.equipped.bottom]?.color : undefined;
-    return {
-      name: "DIHA",
-      skin: this.hexColor(skinColor(style?.skinTone ?? "sand")),
-      hair: this.hexColor(hairColor(style?.hairColor ?? "midnight")),
-      shirt: this.hexColor(topColor ?? "#f7f7f2"),
-      pants: this.hexColor(bottomColor ?? "#4773a5"),
-      hairStyle: style?.hairStyle ?? "wave",
-      glassesStyle: style?.glassesStyle ?? "none"
+    const appearance: PetProfile = {
+      name: style?.name ?? "DIHA",
+      species: style?.species ?? "dog",
+      breed: style?.breed ?? "maltese",
+      furColor: style?.furColor ?? "snow",
+      pattern: style?.pattern ?? "solid",
+      collar: style?.collar ?? "teal",
+      hat: style?.hat ?? "none",
+      accessory: style?.accessory && style.accessory !== "none" ? style.accessory : style?.equipped?.accessory ? "round" : "none",
+      outfit: style?.outfit ?? "tee"
     };
+    return this.toPetRenderProfile(appearance, topColor);
   }
 
-  private randomOpponentProfile(): AthleteProfile {
-    return Phaser.Utils.Array.GetRandom<AthleteProfile>([
-      { name: "MIA", skin: 0xf0b087, hair: 0x704437, shirt: 0x5fc3b7, pants: 0x4c6d83, hairStyle: "bun", glassesStyle: "round" },
-      { name: "JUN", skin: 0xa96547, hair: 0x1d3541, shirt: 0xee806f, pants: 0x385b79, hairStyle: "crop", glassesStyle: "none" },
-      { name: "NOA", skin: 0x6d4234, hair: 0x282532, shirt: 0x718fd0, pants: 0x527060, hairStyle: "curl", glassesStyle: "square" },
-      { name: "SORA", skin: 0xe2a17a, hair: 0x9c5049, shirt: 0x55b789, pants: 0x3f658d, hairStyle: "ponytail", glassesStyle: "none" }
-    ]);
+  private toPetRenderProfile(profile: PetProfile, equippedOutfitColor?: string): PetRenderProfile {
+    const profileOutfitColor = profile.outfit === "none" ? furColorValue(profile.furColor) : OUTFIT_COLORS[profile.outfit];
+    return { ...profile, fur: this.hexColor(furColorValue(profile.furColor)), accent: this.hexColor(petAccentColor(profile)), outfitColor: this.hexColor(equippedOutfitColor ?? profileOutfitColor) };
   }
 
-  private createAthlete(x: number, y: number, scale: number, profile: AthleteProfile, computer: boolean): Phaser.GameObjects.Container {
-    const shadow = this.add.ellipse(0, 17, 68, 14, 0x274954, 0.18);
-    const legs = this.add.rectangle(-11, 3, 14, 35, profile.pants).setOrigin(0.5, 0);
-    const otherLeg = this.add.rectangle(11, 3, 14, 35, profile.pants).setOrigin(0.5, 0);
-    const body = this.add.rectangle(0, -34, 52, 61, profile.shirt).setStrokeStyle(2, 0xffffff, 0.34);
-    const neck = this.add.rectangle(0, -69, 12, 15, profile.skin);
-    const head = this.add.circle(0, -88, 25, profile.skin).setStrokeStyle(2, 0xffffff, 0.3);
-    const hair = this.add.ellipse(0, -103, 48, profile.hairStyle === "crop" ? 18 : 27, profile.hair);
-    const leftEye = this.add.circle(-8, -88, 2.3, 0x233d45);
-    const rightEye = this.add.circle(8, -88, 2.3, 0x233d45);
-    const smile = this.add.arc(0, -79, 7, 12, 168, false, 0x000000, 0).setStrokeStyle(2, 0x934e45);
-    const passiveArm = this.add.rectangle(-30, -39, 34, 9, profile.skin).setAngle(computer ? -15 : 15);
-    const actionArm = this.add.container(18, -46);
-    actionArm.add([
-      this.add.rectangle(15, 0, 32, 9, profile.skin),
-      this.add.circle(32, 0, 6, profile.skin)
-    ]);
+  private randomPetProfile(): PetRenderProfile {
+    const options: PetProfile[] = [
+      { name: "보리", species: "dog", breed: "poodle", furColor: "apricot", pattern: "solid", collar: "coral", hat: "none", accessory: "round", outfit: "tee" },
+      { name: "구름", species: "dog", breed: "bichon", furColor: "snow", pattern: "solid", collar: "navy", hat: "cap", accessory: "none", outfit: "sailor" },
+      { name: "나비", species: "cat", breed: "koreanShorthair", furColor: "cream", pattern: "tabby", collar: "teal", hat: "none", accessory: "none", outfit: "hoodie" },
+      { name: "루나", species: "cat", breed: "russianBlue", furColor: "blue", pattern: "solid", collar: "gold", hat: "none", accessory: "square", outfit: "none" }
+    ];
+    return this.toPetRenderProfile(Phaser.Utils.Array.GetRandom(options));
+  }
+
+  private createSportPet(x: number, y: number, scale: number, profile: PetRenderProfile, computer: boolean): Phaser.GameObjects.Container {
+    const breed = breedDefinition(profile.breed);
+    const shadow = this.add.ellipse(0, 17, 82, 15, 0x274954, 0.18);
+    const leftLeg = this.add.rectangle(-14, -5, 17, 39, profile.fur).setOrigin(0.5, 0).setStrokeStyle(1, profile.accent, 0.24);
+    const rightLeg = this.add.rectangle(14, -5, 17, 39, profile.fur).setOrigin(0.5, 0).setStrokeStyle(1, profile.accent, 0.24);
+    const body = this.add.ellipse(0, -38, 68, 69, profile.outfit === "none" ? profile.fur : profile.outfitColor).setStrokeStyle(2, 0xffffff, 0.34);
+    const head = this.add.ellipse(0, -92, 66, 60, profile.fur).setStrokeStyle(2, 0xffffff, 0.3);
+    const ears = breed.ears === "drop"
+      ? [this.add.ellipse(-32, -91, 22, 49, profile.fur).setAngle(10), this.add.ellipse(32, -91, 22, 49, profile.fur).setAngle(-10)]
+      : [this.add.triangle(-24, -111, -14, 17, 0, -20, 13, 17, profile.fur), this.add.triangle(24, -111, -14, 17, 0, -20, 13, 17, profile.fur)];
+    const muzzle = this.add.ellipse(0, -78, breed.muzzle === "long" ? 42 : 34, 25, 0xf4eadc, 0.86);
+    const nose = this.add.ellipse(0, -83, 9, 7, 0x343536);
+    const leftEye = this.add.circle(-12, -96, 3.5, profile.species === "cat" ? 0x356f66 : 0x233d45);
+    const rightEye = this.add.circle(12, -96, 3.5, profile.species === "cat" ? 0x356f66 : 0x233d45);
+    const smile = this.add.arc(0, -74, 7, 12, 168, false, 0x000000, 0).setStrokeStyle(2, 0x934e45);
+    const passivePaw = this.add.rectangle(-37, -42, 38, 11, profile.fur).setAngle(computer ? -15 : 15).setStrokeStyle(1, profile.accent, 0.2);
+    const actionPaw = this.add.container(21, -48);
+    actionPaw.add([this.add.rectangle(16, 0, 35, 11, profile.fur), this.add.circle(35, 0, 7, profile.fur)]);
     if (this.gameId === "beach-pingpong") {
-      actionArm.add(this.add.circle(43, 0, 12, computer ? 0x4c6f9b : 0xe77467).setStrokeStyle(3, 0xffffff, 0.8));
-      actionArm.add(this.add.rectangle(34, 0, 15, 5, 0x8b6045));
+      actionPaw.add(this.add.circle(46, 0, 13, computer ? 0x4c6f9b : 0xe77467).setStrokeStyle(3, 0xffffff, 0.8));
+      actionPaw.add(this.add.rectangle(37, 0, 16, 5, 0x8b6045));
     }
-    const container = this.add.container(x, y, [shadow, legs, otherLeg, body, neck, head, hair, leftEye, rightEye, smile, passiveArm, actionArm]).setScale(scale);
-    if (profile.hairStyle === "bun") container.add(this.add.circle(0, -119, 13, profile.hair));
-    if (profile.hairStyle === "curl") {
-      container.add(this.add.circle(-20, -101, 11, profile.hair));
-      container.add(this.add.circle(20, -101, 11, profile.hair));
-    }
-    if (profile.hairStyle === "bob") container.add([this.add.rectangle(-21, -91, 9, 34, profile.hair), this.add.rectangle(21, -91, 9, 34, profile.hair)]);
-    if (profile.hairStyle === "ponytail") container.add(this.add.ellipse(28, -94, 18, 43, profile.hair).setAngle(-18));
-    if (profile.hairStyle === "side-part") container.add(this.add.triangle(-5, -107, -22, -3, 20, -12, 18, 14, profile.hair));
-    this.addAthleteGlasses(container, profile.glassesStyle);
-    container.setData("action-arm", actionArm).setData("action-leg", otherLeg);
+    const tail = profile.species === "cat" ? this.add.arc(32, -36, 31, 250, 80, false, 0x000000, 0).setStrokeStyle(9, profile.fur) : this.add.ellipse(39, -49, 31, 13, profile.fur).setAngle(-25);
+    const container = this.add.container(x, y, [shadow, tail, leftLeg, rightLeg, body, ...ears, head, muzzle, nose, leftEye, rightEye, smile, passivePaw, actionPaw]).setScale(scale);
+    this.addFrontPetAccessories(container, profile);
+    container.setData("action-paw", actionPaw).setData("action-leg", rightLeg);
     return container;
   }
 
-  private addAthleteGlasses(container: Phaser.GameObjects.Container, style: GlassesStyle): void {
-    if (style === "none") return;
-    const rounded = style !== "square";
-    const left = rounded
-      ? this.add.circle(-9, -88, 7, 0xcce9e4, style === "aviator" ? 0.28 : 0.1).setStrokeStyle(2, 0x274751)
-      : this.add.rectangle(-9, -88, 15, 12, 0xcce9e4, 0.1).setStrokeStyle(2, 0x274751);
-    const right = rounded
-      ? this.add.circle(9, -88, 7, 0xcce9e4, style === "aviator" ? 0.28 : 0.1).setStrokeStyle(2, 0x274751)
-      : this.add.rectangle(9, -88, 15, 12, 0xcce9e4, 0.1).setStrokeStyle(2, 0x274751);
-    const bridge = this.add.rectangle(0, -88, 5, 2, 0x274751);
-    container.add([left, right, bridge]);
+  private addFrontPetAccessories(container: Phaser.GameObjects.Container, profile: PetRenderProfile): void {
+    if (profile.accessory === "round" || profile.accessory === "square" || profile.accessory === "sunglasses") {
+      const square = profile.accessory === "square";
+      const alpha = profile.accessory === "sunglasses" ? 0.72 : 0.12;
+      const left = square ? this.add.rectangle(-13, -96, 20, 15, 0x264751, alpha).setStrokeStyle(2, 0x274751) : this.add.circle(-13, -96, 9, 0x264751, alpha).setStrokeStyle(2, 0x274751);
+      const right = square ? this.add.rectangle(13, -96, 20, 15, 0x264751, alpha).setStrokeStyle(2, 0x274751) : this.add.circle(13, -96, 9, 0x264751, alpha).setStrokeStyle(2, 0x274751);
+      container.add([left, right, this.add.rectangle(0, -96, 7, 2, 0x274751)]);
+    }
+    if (profile.hat !== "none") {
+      const color = profile.hat === "cap" ? 0x3b8490 : profile.hat === "beanie" ? 0xef7c6e : 0xe5c270;
+      container.add(this.add.ellipse(0, -122, profile.hat === "sunhat" ? 88 : 58, profile.hat === "beanie" ? 28 : 18, color));
+    }
   }
 
   private hexColor(value: string): number {
     return Phaser.Display.Color.HexStringToColor(value).color;
   }
 
-  private swingAthlete(athlete?: Phaser.GameObjects.Container, computer = false, kick = false): void {
-    if (!athlete) return;
-    const limb = athlete.getData(kick ? "action-leg" : "action-arm") as Phaser.GameObjects.Container | Phaser.GameObjects.Rectangle;
+  private swingPet(pet?: Phaser.GameObjects.Container, computer = false, kick = false): void {
+    if (!pet) return;
+    const limb = pet.getData(kick ? "action-leg" : "action-paw") as Phaser.GameObjects.Container | Phaser.GameObjects.Rectangle;
     this.tweens.killTweensOf(limb);
     limb.rotation = kick ? 0 : computer ? -0.35 : 0.35;
     this.tweens.add({ targets: limb, rotation: kick ? -0.78 : computer ? 0.75 : -0.75, duration: 115, yoyo: true, ease: "Quad.easeOut" });
@@ -541,6 +567,460 @@ export class MiniGameScene extends Phaser.Scene {
     };
     spawn();
     this.spawnEvent = this.time.addEvent({ delay: 520, callback: spawn, loop: true });
+  }
+
+  private createOceanRun(): void {
+    this.durationMs = 48_000;
+    this.health = 3;
+    this.scoreText?.setPosition(16, 146).setFontSize(12).setBackgroundColor("#061d2ab8").setPadding(9, 6);
+    this.timerText?.setPosition(374, 146).setFontSize(14).setBackgroundColor("#061d2ab8").setPadding(9, 6);
+    this.enterOceanChapter("beach", true);
+    this.input.keyboard?.on("keydown-LEFT", () => this.moveLane(-1));
+    this.input.keyboard?.on("keydown-RIGHT", () => this.moveLane(1));
+    this.input.keyboard?.on("keydown-UP", () => this.jumpOceanRunner());
+    this.input.keyboard?.on("keydown-SPACE", () => this.jumpOceanRunner());
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      this.pointerStart = new Phaser.Math.Vector2(pointer.worldX, pointer.worldY);
+    });
+    this.input.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+      if (!this.pointerStart) return;
+      const dx = pointer.worldX - this.pointerStart.x;
+      const dy = pointer.worldY - this.pointerStart.y;
+      if (Math.abs(dx) > 34 && Math.abs(dx) > Math.abs(dy)) this.moveLane(dx > 0 ? 1 : -1);
+      else if (dy < -24 || Math.abs(dx) < 18) this.jumpOceanRunner();
+      this.pointerStart = undefined;
+    });
+    this.spawnEvent = this.time.addEvent({ delay: 720, callback: () => this.spawnOceanObject(), loop: true });
+    this.updateOceanHud();
+  }
+
+  private updateOceanRun(delta: number, time: number): void {
+    const elapsed = time - this.startedAt;
+    const nextChapterIndex = Math.min(3, Math.floor(elapsed / 12_000));
+    if (nextChapterIndex > this.oceanChapterIndex && !this.oceanTransitioning) {
+      if (nextChapterIndex === 2 && !this.oceanGear.oxygenTank) {
+        this.infoText?.setText("해저 동굴 체크포인트 · 상점의 산소통이 필요해요.");
+        this.finish(false);
+        return;
+      }
+      if (nextChapterIndex === 3 && !this.oceanGear.submarine) {
+        this.infoText?.setText("심해 체크포인트 · 상점의 잠수함이 필요해요.");
+        this.finish(false);
+        return;
+      }
+      const next = OCEAN_RUN_CHAPTERS[nextChapterIndex];
+      if (next) this.enterOceanChapter(next.id, false);
+    }
+
+    const chapterSpeed = 190 + this.oceanChapterIndex * 24 + Math.min(70, elapsed / 400);
+    this.oceanDistance += (chapterSpeed * delta) / 10_000;
+    this.score += (chapterSpeed * delta) / 8500;
+
+    if (this.oceanBackground) {
+      const surge = 1.035 + Math.sin(time / 780) * 0.008;
+      this.oceanBackground.setScale(surge).setPosition(195 + Math.sin(time / 1450) * 1.4, 350 + Math.sin(time / 520) * 1.7);
+    }
+
+    for (const ambient of this.oceanAmbient) {
+      if (ambient.getData("perspective-flow")) {
+        let progress = Number(ambient.getData("progress")) + Number(ambient.getData("speed")) * delta / 1000;
+        if (progress > 1) progress -= 1;
+        ambient.setData("progress", progress);
+        const depth = progress * progress;
+        ambient.x = 195 + Number(ambient.getData("spread")) * depth;
+        ambient.y = Phaser.Math.Linear(this.oceanHorizonY, 704, depth);
+        ambient.setScale(Phaser.Math.Linear(0.12, 1.5, depth)).setAlpha(Phaser.Math.Clamp(progress * 1.4, 0.08, 0.68)).setDepth(3 + Math.floor(progress * 5));
+      } else {
+        ambient.y += Number(ambient.getData("speed")) * delta / 1000;
+        if (ambient.y > 725) ambient.y = -60;
+      }
+    }
+
+    for (const object of [...this.runners]) {
+      const speedFactor = Number(object.getData("speed"));
+      const travelTime = Math.max(1_850, 3_350 - this.oceanChapterIndex * 260 - Math.min(620, elapsed / 45));
+      const progress = Number(object.getData("path-progress")) + delta / travelTime * speedFactor;
+      object.setData("path-progress", progress);
+      const depth = Phaser.Math.Clamp(progress * progress, 0, 1.25);
+      const targetLane = Number(object.getData("lane"));
+      object.x = Phaser.Math.Linear(195, this.lanes[targetLane] ?? 195, Phaser.Math.Clamp(progress * 1.08, 0, 1));
+      object.y = Phaser.Math.Linear(this.oceanHorizonY, 686, depth);
+      object.setScale(Phaser.Math.Linear(0.07, 1.18, Math.pow(Phaser.Math.Clamp(progress, 0, 1), 1.55))).setDepth(7 + Math.floor(progress * 9));
+      const reachesRunner = progress > 0.82 && progress < 0.97 && targetLane === this.laneIndex;
+      if (this.runner && reachesRunner && (object.getData("collectible") || !this.oceanJumping)) {
+        if (object.getData("collectible")) {
+          this.score += 120;
+          this.combo += 1;
+          this.infoText?.setText(`진주 콤보 ${this.combo} · +120`);
+          this.cameras.main.flash(80, 255, 224, 135, false);
+        } else if (time >= this.oceanInvulnerableUntil) {
+          this.health -= 1;
+          this.combo = 0;
+          this.oceanInvulnerableUntil = time + 750;
+          this.cameras.main.shake(150, 0.009);
+          this.infoText?.setText(`${String(object.getData("label"))} 충돌 · 좌우 이동 또는 점프로 피하세요!`);
+          this.runner.setAlpha(0.45);
+          this.time.delayedCall(420, () => this.runner?.setAlpha(1));
+          if (this.health <= 0) {
+            this.finish(false);
+            return;
+          }
+        }
+        this.removeOceanObject(object);
+        this.updateOceanHud();
+      } else if (progress > 1.08) {
+        if (!object.getData("collectible")) {
+          this.score += 28;
+          this.combo += 1;
+        }
+        this.removeOceanObject(object);
+      }
+    }
+
+    if (time - this.oceanLastProgressAt > 180) {
+      this.oceanLastProgressAt = time;
+      this.updateOceanHud();
+    }
+  }
+
+  private enterOceanChapter(chapter: OceanRunChapterId, immediate: boolean): void {
+    const index = OCEAN_RUN_CHAPTERS.findIndex((item) => item.id === chapter);
+    if (index < 0) return;
+    this.oceanChapterIndex = index;
+    const applyChapter = () => {
+      if (this.finished) return;
+      this.clearOceanWorld();
+      this.drawOceanWorld(chapter);
+      this.createOceanRunnerAvatar(chapter);
+      const chapterInfo = OCEAN_RUN_CHAPTERS[index]!;
+      this.oceanChapterText = this.add.text(195, 190, `${chapterInfo.number}  ${chapterInfo.title}`, {
+        fontFamily: "system-ui",
+        fontSize: "13px",
+        fontStyle: "bold",
+        color: "#ffffff",
+        backgroundColor: "#123b4fc7",
+        padding: { x: 12, y: 7 },
+        resolution: Number(this.registry.get("render-scale")) || 1
+      }).setOrigin(0.5).setDepth(18).setAlpha(immediate ? 1 : 0);
+      if (!immediate) {
+        this.tweens.add({ targets: this.oceanChapterText, alpha: 1, y: 203, duration: 220, yoyo: true, hold: 850, onComplete: () => this.oceanChapterText?.setAlpha(0) });
+      }
+      this.oceanTransitioning = false;
+      this.updateOceanHud();
+    };
+
+    if (immediate) {
+      applyChapter();
+      return;
+    }
+    this.oceanTransitioning = true;
+    const transitionCopy = chapter === "surf" ? "바다로 점프!" : chapter === "cave" ? "산소통 장착" : "잠수함 도킹";
+    const transitionColor = chapter === "surf" ? 0x4fcfd0 : chapter === "cave" ? 0x24365f : 0x07152f;
+    const curtain = this.add.rectangle(195, 350, 390, 700, transitionColor, 0).setDepth(40);
+    const copy = this.add.text(195, 350, transitionCopy, { fontFamily: "system-ui", fontSize: "24px", fontStyle: "bold", color: "#ffffff", resolution: Number(this.registry.get("render-scale")) || 1 }).setOrigin(0.5).setDepth(41).setAlpha(0);
+    if (this.runner) this.tweens.add({ targets: this.runner, y: this.oceanRunnerY - 105, angle: -7, duration: 260, ease: "Quad.easeOut" });
+    this.tweens.add({
+      targets: [curtain, copy],
+      alpha: 1,
+      duration: 260,
+      onComplete: () => {
+        applyChapter();
+        this.tweens.add({ targets: [curtain, copy], alpha: 0, duration: 280, onComplete: () => { curtain.destroy(); copy.destroy(); } });
+      }
+    });
+  }
+
+  private clearOceanWorld(): void {
+    this.oceanEnvironment.forEach((object) => object.destroy());
+    this.oceanAmbient.forEach((object) => object.destroy());
+    this.runners.forEach((object) => object.destroy());
+    this.runner?.destroy();
+    this.oceanChapterText?.destroy();
+    this.oceanEnvironment = [];
+    this.oceanAmbient = [];
+    this.runners = [];
+    this.oceanBackground = undefined;
+    this.runner = undefined;
+    this.oceanChapterText = undefined;
+  }
+
+  private keepOcean<T extends Phaser.GameObjects.GameObject>(object: T): T {
+    this.oceanEnvironment.push(object);
+    return object;
+  }
+
+  private drawOceanWorld(chapter: OceanRunChapterId): void {
+    const texture = {
+      beach: "ocean-run-beach",
+      surf: "ocean-run-surf",
+      cave: "ocean-run-cave",
+      deepsea: "ocean-run-deepsea"
+    }[chapter];
+    const background = this.keepOcean(this.add.image(195, 350, texture).setDisplaySize(390, 700).setDepth(0));
+    this.oceanBackground = background;
+
+    const shade = this.add.graphics().setDepth(1);
+    const upperShade = chapter === "beach" || chapter === "surf" ? 0x072e3c : 0x020915;
+    shade.fillGradientStyle(upperShade, upperShade, upperShade, upperShade, 0.58, 0.58, 0, 0).fillRect(0, 0, 390, 118);
+    shade.fillGradientStyle(0x020915, 0x020915, 0x020915, 0x020915, 0, 0, 0.34, 0.34).fillRect(0, 470, 390, 230);
+    shade.fillGradientStyle(0x07121c, 0x07121c, 0x07121c, 0x07121c, 0.3, 0, 0.3, 0).fillRect(0, 0, 390, 700);
+    this.keepOcean(shade);
+
+    const horizonGlowColor = chapter === "beach" ? 0xfff1b2 : chapter === "surf" ? 0xc9ffff : chapter === "cave" ? 0x67e5db : 0x53aee8;
+    this.keepOcean(this.add.ellipse(195, this.oceanHorizonY + 5, 106, 24, horizonGlowColor, chapter === "deepsea" ? 0.12 : 0.18).setBlendMode(Phaser.BlendModes.ADD).setDepth(2));
+    if (chapter === "surf") {
+      this.keepOcean(this.add.ellipse(20, 515, 135, 24, 0xffffff, 0.18).setAngle(17).setDepth(2));
+      this.keepOcean(this.add.ellipse(370, 485, 150, 25, 0xffffff, 0.18).setAngle(-15).setDepth(2));
+    }
+    this.createOceanPerspectiveFlow(chapter);
+  }
+
+  private createOceanPerspectiveFlow(chapter: OceanRunChapterId): void {
+    for (let index = 0; index < 18; index += 1) {
+      let parts: Phaser.GameObjects.GameObject[];
+      if (chapter === "beach") {
+        parts = [this.add.ellipse(0, 0, 9 + index % 4 * 3, 2, index % 3 ? 0xfff3cf : 0xc99f68, 0.75).setAngle(index * 17)];
+      } else if (chapter === "surf") {
+        parts = [this.add.ellipse(0, 0, 23 + index % 4 * 5, 3, 0xffffff, 0.65), this.add.ellipse(0, -2, 12, 2, 0xbffdf7, 0.7)];
+      } else if (chapter === "cave") {
+        parts = [this.add.circle(0, 0, 3 + index % 3, 0x8df5e6, 0.2).setStrokeStyle(1, 0xcafff7, 0.65)];
+      } else {
+        parts = [this.add.circle(0, 0, 2 + index % 3, index % 3 ? 0x6fe7d8 : 0x9d8cff, 0.72).setBlendMode(Phaser.BlendModes.ADD)];
+      }
+      const flow = this.add.container(195, this.oceanHorizonY, parts)
+        .setData("perspective-flow", true)
+        .setData("progress", (index + 0.5) / 18)
+        .setData("speed", 0.13 + (index % 5) * 0.015)
+        .setData("spread", (index % 3 - 1) * (82 + (index % 4) * 13));
+      this.oceanAmbient.push(flow);
+    }
+  }
+
+  private createOceanRunnerAvatar(chapter: OceanRunChapterId): void {
+    const x = this.lanes[this.laneIndex] ?? 195;
+    if (chapter === "deepsea") {
+      this.runner = this.createRearSubmarine(x, this.oceanRunnerY, this.playerPetProfile());
+      return;
+    }
+    this.runner = this.createPetRunner(x, this.oceanRunnerY, chapter, this.playerPetProfile()).setDepth(15);
+  }
+
+  private createPetRunner(x: number, y: number, chapter: Exclude<OceanRunChapterId, "deepsea">, profile: PetRenderProfile): Phaser.GameObjects.Container {
+    const surfing = chapter === "surf";
+    const diving = chapter === "cave";
+    const breed = breedDefinition(profile.breed);
+    const shadow = this.add.ellipse(0, 49, surfing ? 104 : 88, surfing ? 17 : 21, 0x031e29, surfing ? 0.22 : 0.3);
+    const body = this.add.ellipse(0, -24, breed.size === "large" ? 88 : 76, 82, profile.outfit === "none" ? profile.fur : profile.outfitColor).setStrokeStyle(3, 0xffffff, 0.27);
+    const rump = this.add.ellipse(0, 5, 72, 48, profile.fur).setStrokeStyle(2, profile.accent, profile.pattern === "solid" ? 0.1 : 0.5);
+    const head = this.add.ellipse(0, -78, 67, 63, profile.fur).setStrokeStyle(2, 0xffffff, 0.24);
+    const earParts: Phaser.GameObjects.GameObject[] = breed.ears === "drop"
+      ? [this.add.ellipse(-34, -78, 22, 53, profile.fur).setAngle(8), this.add.ellipse(34, -78, 22, 53, profile.fur).setAngle(-8)]
+      : [this.add.triangle(-24, -101, -15, 20, 0, -22, 15, 20, profile.fur), this.add.triangle(24, -101, -15, 20, 0, -22, 15, 20, profile.fur)];
+    const tail = profile.species === "cat"
+      ? this.add.arc(27, -12, 43, 220, 65, false, 0x000000, 0).setStrokeStyle(12, profile.fur)
+      : this.add.ellipse(37, -30, 48, breed.coat === "fluffy" ? 22 : 15, profile.fur).setAngle(-36);
+    const makeLeg = (side: -1 | 1, front: boolean) => {
+      const limb = this.add.container(side * (front ? 27 : 20), front ? -10 : 8);
+      const leg = this.add.graphics();
+      const legHeight = surfing ? 28 : front ? 38 : 34;
+      leg.fillStyle(profile.fur).fillRoundedRect(-10, 17, 20, legHeight, 10);
+      leg.fillStyle(0xffffff, 0.11).fillRoundedRect(-6, 21, 5, legHeight - 8, 3);
+      leg.lineStyle(1.5, profile.accent, 0.22).strokeRoundedRect(-10, 17, 20, legHeight, 10);
+      limb.add(leg);
+      limb.add(this.add.ellipse(0, 17 + legHeight, 29, 17, diving ? 0x4bc9c2 : profile.fur).setStrokeStyle(1.5, 0xffffff, 0.22));
+      return limb;
+    };
+    const frontLeft = makeLeg(-1, true);
+    const frontRight = makeLeg(1, true);
+    const backLeft = makeLeg(-1, false);
+    const backRight = makeLeg(1, false);
+    const torso = this.add.container(0, 0, [tail, rump, body, ...earParts, head]);
+    if (profile.pattern === "tabby") torso.add([this.add.rectangle(-12, -91, 7, 23, profile.accent).setAngle(-10), this.add.rectangle(0, -94, 7, 25, profile.accent), this.add.rectangle(12, -91, 7, 23, profile.accent).setAngle(10)]);
+    if (profile.pattern === "spotted") torso.add([this.add.circle(-22, -37, 9, profile.accent), this.add.circle(21, -10, 7, profile.accent)]);
+    if (profile.hat !== "none") {
+      const hatColor = profile.hat === "cap" ? 0x3b8490 : profile.hat === "beanie" ? 0xef7c6e : 0xe5c270;
+      torso.add(this.add.ellipse(0, -110, profile.hat === "sunhat" ? 92 : 62, profile.hat === "beanie" ? 32 : 20, hatColor));
+      if (profile.hat === "cap") torso.add(this.add.ellipse(23, -103, 42, 9, 0x2d6975));
+    }
+
+    const parts: Phaser.GameObjects.GameObject[] = [shadow];
+    if (chapter === "beach") {
+      const leftDust = this.add.ellipse(-15, 56, 42, 12, 0xfff2cd, 0.34);
+      const rightDust = this.add.ellipse(15, 56, 42, 12, 0xfff2cd, 0.22);
+      const board = this.add.image(-57, -29, "ocean-run-surfboard").setDisplaySize(82, 136).setAngle(-14);
+      const boardShadow = this.add.ellipse(-53, -19, 40, 118, 0x071d25, 0.22).setAngle(-14);
+      parts.push(leftDust, rightDust, boardShadow, board);
+      this.tweens.add({ targets: leftDust, scaleX: 1.5, alpha: 0.08, duration: 280, yoyo: true, repeat: -1, ease: "Sine.easeOut" });
+      this.tweens.add({ targets: rightDust, scaleX: 1.6, alpha: 0.06, duration: 280, delay: 140, yoyo: true, repeat: -1, ease: "Sine.easeOut" });
+    }
+    if (surfing) {
+      const boardGlow = this.add.ellipse(0, 36, 90, 145, 0x8efff2, 0.14).setBlendMode(Phaser.BlendModes.ADD);
+      const board = this.add.image(0, 39, "ocean-run-surfboard").setDisplaySize(94, 166);
+      const wake = this.add.ellipse(0, 65, 130, 24, 0xffffff, 0.58).setStrokeStyle(3, 0xb9fff7, 0.62);
+      parts.push(boardGlow, wake, board);
+      torso.setY(9).setScale(0.9);
+      frontLeft.setAngle(-35).setPosition(-31, -31);
+      frontRight.setAngle(35).setPosition(31, -31);
+      backLeft.setAngle(-15).setPosition(-14, 2);
+      backRight.setAngle(15).setPosition(14, 2);
+    }
+    if (diving) {
+      const tank = this.add.rectangle(0, -41, 30, 79, 0x38a9a5).setStrokeStyle(4, 0xbffff5, 0.72);
+      const tankTop = this.add.ellipse(0, -81, 30, 12, 0x96eee4).setStrokeStyle(2, 0xd7fff9, 0.7);
+      const straps = this.add.graphics().lineStyle(5, 0x173d48, 0.75).beginPath().arc(0, -51, 29, -1.1, 1.1).strokePath().beginPath().arc(0, -24, 29, -1.1, 1.1).strokePath();
+      parts.push(tank, tankTop, straps);
+    }
+    parts.push(backLeft, backRight, torso, frontLeft, frontRight);
+    const runner = this.add.container(x, y, parts).setScale(surfing ? 0.88 : diving ? 0.8 : 0.86).setDepth(15);
+    this.tweens.add({ targets: [frontLeft, backRight], angle: surfing ? -10 : 24, duration: surfing ? 320 : 125, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    this.tweens.add({ targets: [frontRight, backLeft], angle: surfing ? 10 : -24, duration: surfing ? 320 : 125, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    this.tweens.add({ targets: torso, y: torso.y - (surfing ? 2 : 4), angle: surfing ? 2.4 : 1.2, duration: surfing ? 410 : 145, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    return runner;
+  }
+
+  private createRearSubmarine(x: number, y: number, profile: PetRenderProfile): Phaser.GameObjects.Container {
+    const hull = this.add.ellipse(0, -10, 122, 92, 0xe9b94b).setStrokeStyle(5, 0xfff0a7, 0.86);
+    const hullShade = this.add.ellipse(19, 1, 76, 65, 0x8f5c32, 0.18);
+    const rearGlass = this.add.ellipse(0, -24, 57, 40, 0x16546e).setStrokeStyle(4, 0x8effef, 0.75);
+    const glassGlow = this.add.ellipse(-9, -33, 23, 12, 0xd8ffff, 0.26);
+    const petHead = this.add.ellipse(0, -23, 35, 30, profile.fur).setStrokeStyle(2, 0xffffff, 0.28);
+    const petEars = breedDefinition(profile.breed).ears === "drop"
+      ? [this.add.ellipse(-15, -23, 10, 25, profile.fur), this.add.ellipse(15, -23, 10, 25, profile.fur)]
+      : [this.add.triangle(-12, -35, -7, 11, 0, -13, 8, 11, profile.fur), this.add.triangle(12, -35, -7, 11, 0, -13, 8, 11, profile.fur)];
+    const leftThruster = this.add.circle(-46, 19, 19, 0x173848).setStrokeStyle(4, 0x72d8cf, 0.75);
+    const rightThruster = this.add.circle(46, 19, 19, 0x173848).setStrokeStyle(4, 0x72d8cf, 0.75);
+    const leftPropeller = this.add.container(-46, 19, [this.add.rectangle(0, 0, 5, 33, 0xb9eee7), this.add.rectangle(0, 0, 33, 5, 0xb9eee7)]);
+    const rightPropeller = this.add.container(46, 19, [this.add.rectangle(0, 0, 5, 33, 0xb9eee7), this.add.rectangle(0, 0, 33, 5, 0xb9eee7)]);
+    const fin = this.add.triangle(0, -62, -18, 15, 0, -18, 18, 15, 0xe47864).setStrokeStyle(2, 0xffc2ad, 0.75);
+    const leftLight = this.add.circle(-34, -7, 7, 0x8ffff0).setBlendMode(Phaser.BlendModes.ADD);
+    const rightLight = this.add.circle(34, -7, 7, 0x8ffff0).setBlendMode(Phaser.BlendModes.ADD);
+    const runner = this.add.container(x, y, [this.add.ellipse(0, 42, 130, 28, 0x020b18, 0.35), fin, hull, hullShade, rearGlass, ...petEars, petHead, glassGlow, leftThruster, rightThruster, leftPropeller, rightPropeller, leftLight, rightLight]).setDepth(15).setScale(0.9);
+    this.tweens.add({ targets: leftPropeller, angle: 360, duration: 180, repeat: -1 });
+    this.tweens.add({ targets: rightPropeller, angle: -360, duration: 180, repeat: -1 });
+    this.tweens.add({ targets: [leftLight, rightLight], alpha: 0.35, duration: 480, yoyo: true, repeat: -1 });
+    this.tweens.add({ targets: runner, angle: 1.5, duration: 620, yoyo: true, repeat: -1, ease: "Sine.easeInOut" });
+    return runner;
+  }
+
+  private spawnOceanObject(): void {
+    if (this.finished || this.oceanTransitioning) return;
+    const chapter = OCEAN_RUN_CHAPTERS[this.oceanChapterIndex]?.id ?? "beach";
+    const lane = Phaser.Math.Between(0, 2);
+    const collectible = Math.random() < 0.27;
+    let parts: Phaser.GameObjects.GameObject[];
+    let label = "장애물";
+    if (collectible) {
+      parts = [
+        this.add.circle(0, 4, 23, 0x8ff5e8, 0.18).setBlendMode(Phaser.BlendModes.ADD),
+        this.add.circle(0, 0, 15, 0xffe49a).setStrokeStyle(3, 0xffffff, 0.92),
+        this.add.circle(-5, -5, 5, 0xffffff, 0.78),
+        this.add.arc(0, 0, 19, 210, 345, false, 0x000000, 0).setStrokeStyle(2, 0xe6aa55, 0.55)
+      ];
+      label = "진주";
+    } else if (chapter === "beach") {
+      if (Math.random() < 0.5) {
+        parts = [this.add.ellipse(0, 26, 150, 26, 0x281710, 0.28), this.add.image(0, -15, "ocean-run-palm").setDisplaySize(176, 99)];
+        label = "쓰러진 야자수";
+      } else {
+        parts = [this.add.ellipse(0, 27, 138, 24, 0x281710, 0.28), this.add.image(0, -7, "ocean-run-driftwood").setDisplaySize(155, 103)];
+        label = "산호 유목";
+      }
+    } else if (chapter === "surf") {
+      if (Math.random() < 0.5) {
+        parts = [
+          this.add.ellipse(0, 22, 104, 17, 0x052d42, 0.24),
+          this.add.ellipse(0, 17, 105, 15, 0xffffff, 0.72),
+          this.add.ellipse(0, 19, 78, 7, 0x68e2dc, 0.62),
+          this.add.polygon(0, -3, [-31, 23, -10, -9, 0, -43, 14, -6, 32, 23], 0x173d50).setStrokeStyle(3, 0x9cded8, 0.7),
+          this.add.polygon(3, -9, [-7, 13, 1, -24, 8, 12], 0x426a78, 0.7)
+        ];
+        label = "상어";
+      } else {
+        parts = [
+          this.add.ellipse(0, 16, 128, 25, 0x0b6381, 0.4),
+          this.add.arc(0, 11, 68, 184, 356, false, 0x52caca, 0.68).setStrokeStyle(15, 0x5edbd7, 0.8),
+          this.add.arc(0, 4, 62, 188, 352, false, 0xffffff, 0).setStrokeStyle(8, 0xffffff, 0.9),
+          this.add.ellipse(-28, -7, 25, 11, 0xffffff, 0.7),
+          this.add.ellipse(31, -5, 30, 12, 0xffffff, 0.68)
+        ];
+        label = "큰 파도";
+      }
+    } else if (chapter === "cave") {
+      if (Math.random() < 0.5) {
+        parts = [
+          this.add.ellipse(0, 27, 100, 24, 0x020a12, 0.46),
+          this.add.polygon(0, 0, [-51, 31, -38, -18, -19, -51, 2, -23, 22, -62, 38, -21, 53, 31], 0x2c3c4a).setStrokeStyle(3, 0x76c7bd, 0.46),
+          this.add.polygon(-14, -5, [-27, 24, -19, -18, 2, -39, 9, 20], 0x52636d, 0.72),
+          this.add.circle(18, -16, 5, 0x77e6d4, 0.5).setBlendMode(Phaser.BlendModes.ADD)
+        ];
+        label = "동굴 암초";
+      } else {
+        parts = [
+          this.add.ellipse(0, 24, 78, 19, 0x1c5661, 0.76).setStrokeStyle(2, 0x73d9ca, 0.56),
+          ...Array.from({ length: 6 }, (_, index) => this.add.circle((index % 2 ? 1 : -1) * (7 + index * 2), 8 - index * 14, 5 + index % 3, 0x91f7e8, 0.25).setStrokeStyle(1, 0xd5fff8, 0.72))
+        ];
+        label = "해류 분출";
+      }
+    } else if (Math.random() < 0.5) {
+      parts = [
+        this.add.circle(0, 0, 34, 0x8b6a98, 0.16).setBlendMode(Phaser.BlendModes.ADD),
+        this.add.circle(0, 0, 22, 0x473854).setStrokeStyle(4, 0xb485b8, 0.76),
+        this.add.circle(-7, -7, 5, 0x8ffff0, 0.55),
+        ...Array.from({ length: 10 }, (_, index) => this.add.triangle(Math.cos(index * Math.PI / 5) * 31, Math.sin(index * Math.PI / 5) * 31, -7, 9, 0, -13, 7, 9, 0x9a6a9f).setAngle(index * 36))
+      ];
+      label = "심해 기뢰";
+    } else {
+      parts = [
+        this.add.ellipse(0, -9, 58, 41, 0x8f75ca, 0.83).setStrokeStyle(3, 0xded2ff, 0.72),
+        this.add.ellipse(-10, -17, 20, 9, 0xffffff, 0.22),
+        ...[-19, -7, 7, 19].map((x, index) => this.add.line(0, 0, x, 7, x + (index % 2 ? 7 : -7), 53 + index * 3, index % 2 ? 0x72ded6 : 0xb698e5, 0.85).setOrigin(0))
+      ];
+      label = "해파리";
+    }
+    const object = this.add.container(195, this.oceanHorizonY, parts).setDepth(9).setScale(0.07);
+    object.setData("collectible", collectible)
+      .setData("speed", Phaser.Math.FloatBetween(0.9, 1.14))
+      .setData("label", label)
+      .setData("lane", lane)
+      .setData("path-progress", 0);
+    this.runners.push(object);
+  }
+
+  private removeOceanObject(object: Phaser.GameObjects.Container): void {
+    object.destroy();
+    this.runners = this.runners.filter((item) => item !== object);
+  }
+
+  private jumpOceanRunner(): void {
+    if (!this.runner || this.oceanJumping || this.oceanTransitioning || this.finished) return;
+    this.oceanJumping = true;
+    const chapter = OCEAN_RUN_CHAPTERS[this.oceanChapterIndex]?.id;
+    this.tweens.killTweensOf(this.runner);
+    this.tweens.add({
+      targets: this.runner,
+      y: this.oceanRunnerY - (chapter === "deepsea" ? 72 : 92),
+      scaleX: chapter === "deepsea" ? 1.08 : this.runner.scaleX,
+      duration: 240,
+      yoyo: true,
+      ease: "Quad.easeOut",
+      onComplete: () => {
+        if (this.runner) this.runner.y = this.oceanRunnerY;
+        this.oceanJumping = false;
+      }
+    });
+  }
+
+  private updateOceanHud(): void {
+    const chapter = OCEAN_RUN_CHAPTERS[this.oceanChapterIndex] ?? OCEAN_RUN_CHAPTERS[0]!;
+    const distance = Math.floor(this.oceanDistance);
+    this.scoreText?.setText(`${chapter.number} ${chapter.title} · ${distance} m · ${Math.floor(this.score)}점`);
+    if (!this.oceanTransitioning && !this.finished) this.infoText?.setText(`체력 ${"●".repeat(this.health)}${"○".repeat(3 - this.health)} · 좌우 이동 · 점프`);
+    gameBridge.emit("minigame:progress", {
+      gameId: this.gameId,
+      score: Math.floor(this.score),
+      playerPoints: this.oceanChapterIndex + 1,
+      computerPoints: distance
+    });
   }
 
   private createCurrentRun(): void {
@@ -703,6 +1183,7 @@ export class MiniGameScene extends Phaser.Scene {
   }
 
   private successAtTimeout(): boolean {
+    if (this.gameId === "ocean-run") return this.oceanChapterIndex === 3 && this.oceanGear.oxygenTank && this.oceanGear.submarine;
     if (this.gameId === "reef-memory" || this.gameId === "cave-sonar") return this.matchedPairs >= 4;
     if (this.gameId === "beach-football") return this.playerPoints >= 3;
     if (this.gameId === "beach-pingpong" || this.gameId === "beach-volleyball") return this.score > 0 && this.playerPoints >= this.computerPoints;

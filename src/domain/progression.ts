@@ -17,7 +17,7 @@ export function xpProgress(xp: number): { current: number; required: number; rat
   return { current, required, ratio: Math.min(1, current / required) };
 }
 
-export function keeperRank(level: number): string {
+export function petRank(level: number): string {
   if (level >= 30) return "Deep Sea Guardian";
   if (level >= 20) return "Coral Researcher";
   if (level >= 15) return "Ocean Explorer";

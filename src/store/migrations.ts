@@ -10,17 +10,21 @@ const needsSchema = z.object({
   condition: z.number().min(0).max(100)
 });
 
-const profileSchema = z.object({
+const petProfileSchema = z.object({
   name: z.string().trim().min(1).max(20),
-  skinTone: z.enum(["porcelain", "sunrise", "sand", "golden", "cocoa", "deep"]),
-  hairStyle: z.enum(["straight", "wave", "crop", "side-part", "bob", "bun", "curl", "ponytail"]),
-  hairColor: z.enum(["midnight", "espresso", "chestnut", "caramel", "coral", "silver"]),
-  glassesStyle: z.enum(["none", "round", "square", "aviator"])
+  species: z.enum(["dog", "cat"]),
+  breed: z.enum(["maltese", "poodle", "pomeranian", "bichon", "goldenRetriever", "koreanShorthair", "russianBlue", "britishShorthair", "persian", "siamese"]),
+  furColor: z.enum(["snow", "cream", "apricot", "golden", "cocoa", "charcoal", "blue", "seal"]),
+  pattern: z.enum(["solid", "bicolor", "tabby", "spotted", "points"]),
+  collar: z.enum(["none", "teal", "coral", "navy", "gold"]),
+  hat: z.enum(["none", "cap", "beanie", "sunhat"]),
+  accessory: z.enum(["none", "round", "square", "sunglasses", "bandana"]),
+  outfit: z.enum(["none", "tee", "hoodie", "sailor", "raincoat"])
 });
 
 export const gameSaveSchema: z.ZodType<GameSave> = z.object({
-  version: z.literal(4),
-  profile: profileSchema,
+  version: z.literal(5),
+  profile: petProfileSchema,
   tutorialComplete: z.boolean(),
   needs: needsSchema,
   lastSavedAt: z.iso.datetime(),
@@ -96,19 +100,19 @@ export function migrateSave(input: unknown, now = new Date()): RecoveryResult {
   if (input && typeof input === "object") {
     const legacy = input as Record<string, unknown>;
     const version = Number(legacy.version ?? 1);
-    if (version === 1 || version === 2 || version === 3) {
+    if (version >= 1 && version <= 4) {
       const base = createDefaultSave(now);
-      const legacyProfile = legacy.profile && typeof legacy.profile === "object"
-        ? legacy.profile as Partial<GameSave["profile"]>
-        : {};
+      const legacyProfile = legacy.profile && typeof legacy.profile === "object" ? legacy.profile as Record<string, unknown> : {};
+      const legacyName = typeof legacyProfile.name === "string" && legacyProfile.name.trim()
+        ? legacyProfile.name.trim().slice(0, 20)
+        : base.profile.name;
       const merged: GameSave = {
         ...base,
         ...(legacy as Partial<GameSave>),
-        version: 4,
+        version: 5,
         profile: {
           ...base.profile,
-          ...legacyProfile,
-          glassesStyle: legacyProfile.glassesStyle ?? "none"
+          name: legacyName
         },
         settings: { ...base.settings, ...((legacy.settings as Partial<GameSave["settings"]>) ?? {}) },
         stats: { ...base.stats, ...((legacy.stats as Partial<GameSave["stats"]>) ?? {}) },

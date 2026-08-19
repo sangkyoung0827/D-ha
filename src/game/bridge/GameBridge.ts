@@ -1,15 +1,17 @@
-import type { CharacterAppearance, MiniGameResult, RoomId, WearableSlot } from "../../domain/types";
+import type { PetAppearance } from "../../domain/pet";
+import type { MiniGameResult, RoomId, WearableSlot } from "../../domain/types";
 import type { OceanMode, OceanZoneId } from "../../domain/ocean";
 
 export interface BridgeEvents {
   "room:change": { room: RoomId; theme: string };
   "ocean:view": { mode: OceanMode; zone: OceanZoneId };
-  "keeper:style": CharacterAppearance & { equipped: Record<WearableSlot, string | null> };
-  "keeper:react": { action: "feed" | "wash" | "sleep" | "wellness" | "play" | "level" };
+  "pet:style": PetAppearance & { equipped: Record<WearableSlot, string | null> };
+  "pet:react": { action: "feed" | "wash" | "sleep" | "wellness" | "play" | "level" };
   "settings:motion": { reduced: boolean };
   "bath:progress": { progress: number };
   "bath:complete": undefined;
   "kitchen:fridge-open": undefined;
+  "home:door-enter": { room: RoomId };
   "minigame:start": { id: MiniGameResult["gameId"] };
   "minigame:finish": MiniGameResult;
   "minigame:pause": undefined;

@@ -1,21 +1,21 @@
-import { useState, type CSSProperties, type SVGProps } from "react";
-import { OCEAN_ZONES, isOceanZoneUnlocked, type OceanMode, type OceanZoneId } from "../../domain/ocean";
-import type { MiniGameId, MiniGameResult } from "../../domain/types";
+import { useState, type SVGProps } from "react";
+import { OCEAN_RUN_CHAPTERS, OCEAN_RUN_GAME, type OceanMode, type OceanZoneId } from "../../domain/ocean";
+import type { MiniGameResult } from "../../domain/types";
 
 interface OceanHubProps {
   mode: OceanMode;
   zone: OceanZoneId;
   highScores: Record<string, number>;
+  oceanGear: { oxygenTank: boolean; submarine: boolean };
   onModeChange(mode: OceanMode): void;
   onZoneChange(zone: OceanZoneId): void;
   onStartGame(id: MiniGameResult["gameId"]): void;
   onOpenShop(): void;
 }
 
-export function OceanHub({ mode, highScores, onModeChange, onZoneChange, onStartGame, onOpenShop }: OceanHubProps) {
+export function OceanHub({ mode, highScores, oceanGear, onModeChange, onZoneChange, onStartGame, onOpenShop }: OceanHubProps) {
   const [gamesOpen, setGamesOpen] = useState(false);
-  const games = OCEAN_ZONES.flatMap((oceanZone) => oceanZone.games.map((game) => ({ game, oceanZone, unlocked: isOceanZoneUnlocked(oceanZone.id, highScores) })));
-  const unlockedCount = games.filter((item) => item.unlocked).length;
+  const bestScore = highScores[OCEAN_RUN_GAME.id] ?? 0;
 
   const toggleGames = () => {
     onModeChange("exploration");
@@ -26,10 +26,19 @@ export function OceanHub({ mode, highScores, onModeChange, onZoneChange, onStart
     <aside className="ocean-hub" aria-label="Ocean 빠른 메뉴">
       {gamesOpen && (
         <section className="ocean-explore-drawer ocean-games-board" aria-label="Games 선택">
-          <header><div><span>OCEAN ARCADE</span><strong>Games</strong><small>{unlockedCount}/{games.length} OPEN</small></div><button aria-label="Games 닫기" onClick={() => setGamesOpen(false)}>×</button></header>
-          <div className="ocean-games-grid">
-            {games.map(({ game, oceanZone, unlocked }) => <button key={game.id} className={unlocked ? "" : "locked"} data-testid={`start-${game.id}`} disabled={!unlocked} style={{ "--game-accent": game.accent } as CSSProperties} onClick={() => { onZoneChange(oceanZone.id); setGamesOpen(false); onStartGame(game.id); }}><OceanGameThumbnail id={game.id} /><strong>{game.shortTitle}</strong><small>{oceanZone.title} · {oceanZone.depth}</small>{!unlocked && <b>LOCK</b>}</button>)}
-          </div>
+          <header><div><span>ONE WORLD · ONE RUN</span><strong>Games</strong><small>{bestScore ? `BEST ${bestScore.toLocaleString()}` : "NEW RUN"}</small></div><button aria-label="Games 닫기" onClick={() => setGamesOpen(false)}>×</button></header>
+          <article className="ocean-run-card">
+            <OceanRunThumbnail />
+            <div className="ocean-run-intro"><span>BEACH TO ABYSS</span><h3>Ocean Run</h3><p>서핑보드를 들고 출발해 파도, 해저 동굴, 심해까지 끊김 없이 달려요.</p></div>
+            <ol className="ocean-run-route" aria-label="Ocean Run 챕터">
+              {OCEAN_RUN_CHAPTERS.map((chapter) => {
+                const owned = chapter.requiredItemId === null || (chapter.requiredItemId === "ocean-oxygen-tank" ? oceanGear.oxygenTank : oceanGear.submarine);
+                return <li key={chapter.id} className={owned ? "ready" : "gear-needed"}><b>{chapter.number}</b><span><strong>{chapter.title}</strong><small>{chapter.mode}<br />{chapter.hazards}</small></span><em>{chapter.requiredItemId === null ? "READY" : owned ? "장비 완료" : chapter.id === "cave" ? "산소통 필요" : "잠수함 필요"}</em></li>;
+              })}
+            </ol>
+            <div className="ocean-run-gear"><span className={oceanGear.oxygenTank ? "owned" : ""}>O₂ {oceanGear.oxygenTank ? "산소통 보유" : "상점에서 산소통 준비"}</span><span className={oceanGear.submarine ? "owned" : ""}>◉ {oceanGear.submarine ? "잠수함 보유" : "상점에서 잠수함 준비"}</span></div>
+            <button className="ocean-run-start" data-testid="start-ocean-run" onClick={() => { onZoneChange("beach"); setGamesOpen(false); onStartGame(OCEAN_RUN_GAME.id); }}><span>탐험 시작</span><strong>RUN →</strong></button>
+          </article>
         </section>
       )}
 
@@ -48,15 +57,8 @@ export function OceanHub({ mode, highScores, onModeChange, onZoneChange, onStart
   );
 }
 
-function OceanGameThumbnail({ id }: { id: MiniGameId }) {
-  if (id === "beach-volleyball") return <svg className="ocean-game-thumb" viewBox="0 0 100 72" aria-hidden="true"><rect width="100" height="45" rx="11" fill="#8edfdc"/><rect y="43" width="100" height="29" rx="11" fill="#f4d58f"/><circle cx="78" cy="15" r="8" fill="#ffd567"/><path d="M19 26v30M71 26v30M19 29h52M19 38h52M19 47h52M29 29v22M39 29v22M49 29v22M59 29v22" fill="none" stroke="#fff" strokeWidth="1.6" opacity=".9"/><circle cx="48" cy="19" r="7" fill="#ff8b70" stroke="#fff" strokeWidth="2"/><path d="m43 17 10 4m-6-8 2 12" stroke="#ffe97c" strokeWidth="2"/></svg>;
-  if (id === "beach-pingpong") return <svg className="ocean-game-thumb" viewBox="0 0 100 72" aria-hidden="true"><rect width="100" height="72" rx="11" fill="#fff0c7"/><path d="M14 30h72L76 58H24Z" fill="#42a99c" stroke="#176875" strokeWidth="2"/><path d="M50 30v28M16 38h68" stroke="#fff" strokeWidth="2"/><path d="M25 54v12m50-12v12" stroke="#355b62" strokeWidth="3"/><circle cx="41" cy="23" r="4" fill="#fff" stroke="#e3a64b" strokeWidth="1.5"/><circle cx="76" cy="19" r="11" fill="#ec7668"/><path d="m69 27-7 9" stroke="#714a3c" strokeWidth="5" strokeLinecap="round"/></svg>;
-  if (id === "beach-football") return <svg className="ocean-game-thumb" viewBox="0 0 100 72" aria-hidden="true"><rect width="100" height="72" rx="11" fill="#f2d38c"/><path d="M17 16h66v40H17zM17 26h66M29 16v40m14-40v40m14-40v40m14-40v40" fill="none" stroke="#fff" strokeWidth="2" opacity=".85"/><circle cx="50" cy="55" r="12" fill="#fdfbf3" stroke="#263f49" strokeWidth="1.8"/><path d="m50 48 5 4-2 6h-6l-2-6Zm-5 4-5-2m15 2 5-2m-7 8 3 4m-9-4-3 4" fill="#263f49" stroke="#263f49" strokeWidth="1.2"/></svg>;
-  if (id === "open-water-catch") return <svg className="ocean-game-thumb" viewBox="0 0 100 72" aria-hidden="true"><rect width="100" height="72" rx="11" fill="#31a9bf"/><path d="M0 17c17 7 33-6 50 0s33-7 50 0M0 31c17 7 33-6 50 0s33-7 50 0" fill="none" stroke="#aef3e7" strokeWidth="3" opacity=".55"/><ellipse cx="67" cy="41" rx="17" ry="10" fill="#ffd166" stroke="#fff" strokeWidth="2"/><path d="m52 41-12-9v18Z" fill="#ef8a65"/><circle cx="74" cy="38" r="1.8" fill="#173d48"/><ellipse cx="27" cy="52" rx="16" ry="7" fill="#ffe084"/><circle cx="15" cy="50" r="6" fill="#c98563"/><path d="m36 52 9-7m-9 7 9 7" stroke="#68e0d4" strokeWidth="4" strokeLinecap="round"/></svg>;
-  if (id === "reef-surf") return <svg className="ocean-game-thumb" viewBox="0 0 100 72" aria-hidden="true"><rect width="100" height="72" rx="11" fill="#217fa5"/><path d="M-6 48c20-18 37-18 56 0s38 18 58 0v25H-6Z" fill="#75dcd4"/><path d="M-4 54c20-16 36-16 54 0s38 16 57 0" fill="none" stroke="#effff9" strokeWidth="5"/><path d="M64 48 75 29l12 19Z" fill="#173e54"/><ellipse cx="39" cy="45" rx="24" ry="5" fill="#ffc75d" stroke="#fff" strokeWidth="2" transform="rotate(-12 39 45)"/><circle cx="39" cy="23" r="6" fill="#c98263"/><path d="m39 29-6 14m6-14 9 10" stroke="#54d0c6" strokeWidth="5" strokeLinecap="round"/></svg>;
-  if (id === "cave-sonar") return <svg className="ocean-game-thumb" viewBox="0 0 100 72" aria-hidden="true"><rect width="100" height="72" rx="11" fill="#182342"/><path d="M0 0h27l-9 13 10 12-15 12 11 13L0 63Zm100 0H75l8 15-11 12 17 12-10 14 21 11Z" fill="#080f25"/><circle cx="50" cy="35" r="7" fill="#72e2d1"/><circle cx="50" cy="35" r="15" fill="none" stroke="#9b91e0" strokeWidth="2"/><circle cx="50" cy="35" r="25" fill="none" stroke="#72e2d1" strokeWidth="1.5" opacity=".7"/><circle cx="36" cy="17" r="3" fill="#f1cf70"/><circle cx="68" cy="52" r="3" fill="#c09df2"/></svg>;
-  if (id === "deepsea-descent") return <svg className="ocean-game-thumb" viewBox="0 0 100 72" aria-hidden="true"><rect width="100" height="72" rx="11" fill="#07132f"/><g fill="#73ded3"><circle cx="16" cy="14" r="1.4"/><circle cx="82" cy="18" r="2"/><circle cx="68" cy="57" r="1.3"/><circle cx="26" cy="49" r="2"/></g><ellipse cx="47" cy="37" rx="22" ry="13" fill="#f0c65d" stroke="#fff4c9" strokeWidth="2"/><rect x="38" y="30" width="18" height="13" rx="5" fill="#254c6b"/><circle cx="47" cy="36" r="4" fill="#91e8df"/><path d="m25 37-10-8v16Zm44 0 25-14v28Z" fill="#6678a7"/><path d="m69 37 27-13v26Z" fill="#ffe889" opacity=".28"/></svg>;
-  return <svg className="ocean-game-thumb" viewBox="0 0 100 72" aria-hidden="true"><rect width="100" height="72" rx="11" fill="#dff3ec"/><circle cx="50" cy="36" r="18" fill="#54c9bd"/></svg>;
+function OceanRunThumbnail() {
+  return <svg className="ocean-run-thumb" viewBox="0 0 340 118" aria-hidden="true"><defs><linearGradient id="run-sea" x1="0" y1="0" x2="1" y2="0"><stop stopColor="#ffd98b"/><stop offset=".29" stopColor="#48cfcb"/><stop offset=".62" stopColor="#245b7a"/><stop offset="1" stopColor="#071a38"/></linearGradient></defs><rect width="340" height="118" rx="20" fill="url(#run-sea)"/><circle cx="42" cy="26" r="16" fill="#fff0a8"/><path d="M0 78c34-19 62-16 91 0s55 17 84 0 61-18 92 0 49 18 73 4v36H0Z" fill="#fff" opacity=".32"/><path d="M86 70c0-18 11-31 22-38l7 31-8 26" fill="none" stroke="#183e48" strokeWidth="7" strokeLinecap="round"/><path d="m104 35 19-14M109 44l22-4" stroke="#21745f" strokeWidth="7" strokeLinecap="round"/><ellipse cx="143" cy="82" rx="35" ry="7" fill="#ffd15f" stroke="#fff" strokeWidth="2" transform="rotate(-9 143 82)"/><circle cx="145" cy="49" r="8" fill="#c98665"/><path d="m145 57-8 22m8-22 14 19" stroke="#f8f7ef" strokeWidth="8" strokeLinecap="round"/><path d="m198 81 12-27 14 27Z" fill="#17384d"/><path d="M242 0h32l-9 18 10 15-12 18 10 15-16 22-15-5Z" fill="#101936" opacity=".82"/><ellipse cx="298" cy="75" rx="30" ry="18" fill="#efc45e" stroke="#fff1ba" strokeWidth="2"/><circle cx="298" cy="73" r="9" fill="#70d9d1"/><path d="m267 75-16-11v22Zm61 0 12-8v16Z" fill="#7587aa"/><g fill="#8dfff0"><circle cx="286" cy="25" r="2"/><circle cx="319" cy="42" r="3"/><circle cx="280" cy="97" r="2"/></g></svg>;
 }
 
 function SurfboardIcon(props: SVGProps<SVGSVGElement>) {

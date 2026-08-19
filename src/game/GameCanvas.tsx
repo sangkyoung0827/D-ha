@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { useEffect, useRef } from "react";
-import { appearanceDescription } from "../domain/appearance";
-import type { CharacterAppearance, MiniGameResult, RoomId, WearableSlot } from "../domain/types";
+import { petDescription, type PetAppearance } from "../domain/pet";
+import type { MiniGameResult, RoomId, WearableSlot } from "../domain/types";
 import { gameBridge } from "./bridge/GameBridge";
 import { GAME_HEIGHT, GAME_WIDTH, getRenderScale } from "./renderQuality";
 import { BootScene } from "./scenes/BootScene";
@@ -12,10 +12,11 @@ interface GameCanvasProps {
   room: RoomId;
   theme: string;
   equipped: Record<WearableSlot, string | null>;
-  appearance: CharacterAppearance;
+  appearance: PetAppearance;
   reducedMotion: boolean;
   oceanMode: OceanMode;
   oceanZone: OceanZoneId;
+  oceanGear: { oxygenTank: boolean; submarine: boolean };
   activeMiniGame: MiniGameResult["gameId"] | null;
   onMiniGameFinish(result: MiniGameResult): void;
   onBathComplete(): void;
@@ -25,6 +26,8 @@ interface GameCanvasProps {
 export function GameCanvas(props: GameCanvasProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const gameRef = useRef<Phaser.Game | null>(null);
+  const oxygenTank = props.oceanGear.oxygenTank;
+  const submarine = props.oceanGear.submarine;
   const presentationRef = useRef({
     room: props.room,
     theme: props.theme,
@@ -47,7 +50,7 @@ export function GameCanvas(props: GameCanvasProps) {
       transparent: true,
       scene: [BootScene, RoomScene],
       render: { antialias: true, antialiasGL: true, pixelArt: false, roundPixels: false, powerPreference: "high-performance" },
-      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: GAME_WIDTH * renderScale, height: GAME_HEIGHT * renderScale, autoRound: false },
+      scale: { mode: Phaser.Scale.ENVELOP, autoCenter: Phaser.Scale.CENTER_BOTH, width: GAME_WIDTH * renderScale, height: GAME_HEIGHT * renderScale, autoRound: false },
       input: { activePointers: 2 },
       callbacks: {
         preBoot(bootingGame) {
@@ -79,7 +82,7 @@ export function GameCanvas(props: GameCanvasProps) {
   }, [props.room, props.theme]);
 
   useEffect(() => {
-    gameBridge.emit("keeper:style", {
+    gameBridge.emit("pet:style", {
       equipped: props.equipped,
       ...props.appearance
     });
@@ -117,12 +120,12 @@ export function GameCanvas(props: GameCanvasProps) {
       if (cancelled || !gameRef.current) return;
       if (!game.scene.keys.minigame) game.scene.add("minigame", MiniGameScene, false);
       if (game.scene.isActive("room")) game.scene.sleep("room");
-      game.scene.start("minigame", { id: props.activeMiniGame });
+      game.scene.start("minigame", { id: props.activeMiniGame, oceanGear: { oxygenTank, submarine } });
     });
     return () => {
       cancelled = true;
     };
-  }, [props.activeMiniGame]);
+  }, [props.activeMiniGame, oxygenTank, submarine]);
 
-  return <div ref={hostRef} className="phaser-host" aria-label={`디하 게임 화면: ${appearanceDescription(props.appearance)}`} />;
+  return <div ref={hostRef} className="phaser-host" aria-label={`디하 반려동물 게임 화면: ${petDescription(props.appearance)}`} />;
 }

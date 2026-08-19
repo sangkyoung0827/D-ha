@@ -1,31 +1,32 @@
-import { useState, type CSSProperties } from "react";
+import { useState } from "react";
 import {
-  appearanceDescription,
-  GLASSES_STYLES,
-  HAIR_COLORS,
-  HAIR_STYLES,
-  hairColor,
-  SKIN_TONES,
-  skinColor,
-  type AppearanceOption
-} from "../../domain/appearance";
-import type { CharacterProfile } from "../../domain/types";
+  FUR_COLORS,
+  PET_ACCESSORIES,
+  PET_COLLARS,
+  PET_HATS,
+  PET_OUTFITS,
+  PET_PATTERNS,
+  breedsForSpecies,
+  petDescription,
+  type PetOption,
+  type PetProfile,
+  type PetSpecies
+} from "../../domain/pet";
 import { useGameStore } from "../../store/gameStore";
 import { useAccount } from "../../platform/auth/AccountProvider";
 import { GoogleSignInScreen } from "../auth/GoogleSignInScreen";
 import { GameIcon } from "../icons/GameIcon";
-
-type PreviewStyle = CSSProperties & { "--skin": string; "--hair": string };
+import { PetAvatar } from "../pet/PetAvatar";
 
 export function Onboarding() {
   const profile = useGameStore((state) => state.profile);
-  const createKeeper = useGameStore((state) => state.createKeeper);
+  const createPet = useGameStore((state) => state.createPet);
   const finishTutorial = useGameStore((state) => state.finishTutorial);
   const hydratedOwner = useGameStore((state) => state.hydratedOwner);
   const syncStatus = useGameStore((state) => state.syncStatus);
   const { status: accountStatus, account } = useAccount();
   const [step, setStep] = useState<"intro" | "create" | "account" | "tour">("intro");
-  const [draft, setDraft] = useState<CharacterProfile>(profile);
+  const [draft, setDraft] = useState<PetProfile>(profile);
 
   const visibleStep = step === "account" && accountStatus === "signed-in" && account && hydratedOwner === `user:${account.uid}` && syncStatus !== "syncing"
     ? "tour"
@@ -49,37 +50,37 @@ export function Onboarding() {
   }
 
   if (visibleStep === "create") {
-    const previewStyle: PreviewStyle = { "--skin": skinColor(draft.skinTone), "--hair": hairColor(draft.hairColor) };
+    const selectSpecies = (species: PetSpecies) => {
+      const breed = breedsForSpecies(species)[0]!;
+      setDraft({ ...draft, species, breed: breed.id, furColor: breed.defaultFur, pattern: breed.defaultPattern });
+    };
     return (
-      <main className="onboarding create-screen" data-testid="character-creator">
-        <p className="eyebrow">DIHA CHARACTER</p>
-        <h1>나만의 디하를 만들어볼까요?</h1>
-        <div
-          className={`css-keeper hair-style-${draft.hairStyle}`}
-          style={previewStyle}
-          data-testid="character-preview"
-          data-skin-tone={draft.skinTone}
-          data-hair-style={draft.hairStyle}
-          data-hair-color={draft.hairColor}
-          data-glasses-style={draft.glassesStyle}
-          aria-label={`디하 미리보기: ${appearanceDescription(draft)}`}
-        >
-          <span className="css-hair-back" />
-          <span className="css-face"><i /><i /><b /></span>
-          <span className="css-hair" />
-          <span className={`css-glasses glasses-${draft.glassesStyle}`}><i /><i /></span>
-          <span className="css-arms" />
-          <span className="css-shirt" />
-          <span className="css-legs" />
-          <span className="css-shoes" />
-        </div>
-        <p className="appearance-summary" aria-live="polite">{appearanceDescription(draft)}<small>기본 복장 · 흰 반팔 + 청바지</small></p>
-        <label className="field-label">이름<input value={draft.name} maxLength={20} onChange={(event) => setDraft({ ...draft, name: event.target.value })} aria-label="캐릭터 이름" /></label>
-        <Picker label="피부색" options={SKIN_TONES} value={draft.skinTone} onChange={(skinTone) => setDraft({ ...draft, skinTone })} />
-        <Picker label="머리 스타일" options={HAIR_STYLES} value={draft.hairStyle} onChange={(hairStyle) => setDraft({ ...draft, hairStyle })} />
-        <Picker label="머리 색상" options={HAIR_COLORS} value={draft.hairColor} onChange={(hairColor) => setDraft({ ...draft, hairColor })} />
-        <Picker label="안경" options={GLASSES_STYLES} value={draft.glassesStyle} onChange={(glassesStyle) => setDraft({ ...draft, glassesStyle })} />
-        <button className="primary-button wide create-submit" disabled={!draft.name.trim()} onClick={() => { createKeeper({ ...draft, name: draft.name.trim() }); setStep(accountStatus === "signed-in" ? "tour" : "account"); }}>이 모습으로 시작</button>
+      <main className="onboarding create-screen pet-create-screen" data-testid="pet-creator">
+        <p className="eyebrow">DIHA PET</p>
+        <h1>함께할 반려동물을 골라요</h1>
+        <PetAvatar appearance={draft} testId="pet-preview" />
+        <p className="appearance-summary" aria-live="polite">{petDescription(draft)}<small>{draft.species === "dog" ? "강아지" : "고양이"} · 종 고유 특징을 유지해요</small></p>
+        <label className="field-label">이름<input value={draft.name} maxLength={20} onChange={(event) => setDraft({ ...draft, name: event.target.value })} aria-label="반려동물 이름" /></label>
+        <fieldset className="picker species-picker"><legend>종</legend><div>
+          <button type="button" className={draft.species === "dog" ? "selected" : ""} aria-pressed={draft.species === "dog"} onClick={() => selectSpecies("dog")}>🐶 강아지</button>
+          <button type="button" className={draft.species === "cat" ? "selected" : ""} aria-pressed={draft.species === "cat"} onClick={() => selectSpecies("cat")}>🐱 고양이</button>
+        </div></fieldset>
+        <fieldset className="picker breed-picker"><legend>품종</legend><div>{breedsForSpecies(draft.species).map((breed) => <button
+          key={breed.id}
+          type="button"
+          className={breed.id === draft.breed ? "selected" : ""}
+          aria-label={`품종 ${breed.label}`}
+          aria-pressed={breed.id === draft.breed}
+          data-testid={`pet-breed-${breed.id}`}
+          onClick={() => setDraft({ ...draft, breed: breed.id, species: breed.species, furColor: breed.defaultFur, pattern: breed.defaultPattern })}
+        >{breed.label}</button>)}</div></fieldset>
+        <Picker label="털 색상" options={FUR_COLORS} value={draft.furColor} onChange={(furColor) => setDraft({ ...draft, furColor })} />
+        <Picker label="기본 무늬" options={PET_PATTERNS} value={draft.pattern} onChange={(pattern) => setDraft({ ...draft, pattern })} />
+        <Picker label="목걸이" options={PET_COLLARS} value={draft.collar} onChange={(collar) => setDraft({ ...draft, collar })} />
+        <Picker label="모자" options={PET_HATS} value={draft.hat} onChange={(hat) => setDraft({ ...draft, hat })} />
+        <Picker label="안경/액세서리" options={PET_ACCESSORIES} value={draft.accessory} onChange={(accessory) => setDraft({ ...draft, accessory })} />
+        <Picker label="의상" options={PET_OUTFITS} value={draft.outfit} onChange={(outfit) => setDraft({ ...draft, outfit })} />
+        <button className="primary-button wide create-submit" disabled={!draft.name.trim()} onClick={() => { createPet({ ...draft, name: draft.name.trim() }); setStep(accountStatus === "signed-in" ? "tour" : "account"); }}>이 모습으로 시작</button>
       </main>
     );
   }
@@ -101,7 +102,7 @@ export function Onboarding() {
   );
 }
 
-function Picker<T extends string>({ label, options, value, onChange }: { label: string; options: readonly AppearanceOption<T>[]; value: T; onChange(value: T): void }) {
+function Picker<T extends string>({ label, options, value, onChange }: { label: string; options: readonly PetOption<T>[]; value: T; onChange(value: T): void }) {
   return (
     <fieldset className="picker">
       <legend>{label}</legend>
@@ -112,7 +113,7 @@ function Picker<T extends string>({ label, options, value, onChange }: { label: 
           className={option.id === value ? "selected" : ""}
           aria-label={`${label} ${option.label}`}
           aria-pressed={option.id === value}
-          data-testid={`appearance-${option.id}`}
+          data-testid={`pet-option-${option.id}`}
           onClick={() => onChange(option.id)}
         >
           {option.color ? <><span className="swatch" style={{ background: option.color }} aria-hidden="true" /><small>{option.label}</small></> : option.label}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { GameCanvas } from "../game/GameCanvas";
 import { gameBridge } from "../game/bridge/GameBridge";
 import type { MiniGameResult, RoomId } from "../domain/types";
@@ -13,10 +13,13 @@ import { DebugPanel } from "../components/game-ui/DebugPanel";
 import { loadMiniGameDefinition } from "../minigames/core/loadDefinition";
 import { GameRoom } from "../components/game-ui/GameRoom";
 import { OceanHub } from "../components/game-ui/OceanHub";
-import { OCEAN_ZONES, isOceanGame, oceanZoneForGame, type OceanMode, type OceanZoneId } from "../domain/ocean";
+import { isOceanGame, ownsOceanGear, type OceanMode, type OceanZoneId } from "../domain/ocean";
 import { startPwaUpdate } from "../platform/pwa/update";
 import { useAccount } from "../platform/auth/AccountProvider";
 import { GoogleSignInScreen } from "../components/auth/GoogleSignInScreen";
+import { isHomeInterior } from "../domain/home";
+
+const Home3DCanvas = lazy(() => import("../components/game-ui/Home3DCanvas").then((module) => ({ default: module.Home3DCanvas })));
 
 export function App() {
   const hydrated = useGameStore((state) => state.hydrated);
@@ -34,6 +37,7 @@ export function App() {
   const activeMiniGame = useGameStore((state) => state.activeMiniGame);
   const toast = useGameStore((state) => state.toast);
   const highScores = useGameStore((state) => state.highScores);
+  const inventory = useGameStore((state) => state.inventory);
   const recoveryMessage = useGameStore((state) => state.recoveryMessage);
   const recoveryBackup = useGameStore((state) => state.recoveryBackup);
   const setRoom = useGameStore((state) => state.setRoom);
@@ -66,10 +70,18 @@ export function App() {
     return () => window.clearTimeout(timer);
   }, [toast, clearToast]);
   useEffect(() => gameBridge.on("kitchen:fridge-open", () => setOverlay("fridge")), [setOverlay]);
+  useEffect(() => gameBridge.on("home:door-enter", ({ room }) => {
+    if (room === "wellness") {
+      setOceanMode("exploration");
+      setOceanZone("beach");
+    }
+    setBathProgress(0);
+    setRoom(room);
+  }), [setRoom]);
 
   const handleBathComplete = useCallback(() => {
     care("wash");
-    gameBridge.emit("keeper:react", { action: "wash" });
+      gameBridge.emit("pet:react", { action: "wash" });
     setBathProgress(0);
   }, [care]);
   const handleBathProgress = useCallback((progress: number) => setBathProgress(progress), []);
@@ -84,12 +96,10 @@ export function App() {
 
   const claimReward = (result: MiniGameResult) => {
     completeMiniGame(result);
-    gameBridge.emit("keeper:react", { action: result.success ? "play" : "wellness" });
+    gameBridge.emit("pet:react", { action: result.success ? "play" : "wellness" });
     setPendingResult(null);
     if (isOceanGame(result.gameId)) {
-      const completedZone = oceanZoneForGame(result.gameId);
-      const index = OCEAN_ZONES.findIndex((zone) => zone.id === completedZone);
-      if (result.success && index >= 0 && index < OCEAN_ZONES.length - 1) setOceanZone(OCEAN_ZONES[index + 1]!.id);
+      setOceanZone("beach");
       setOceanMode("exploration");
       setRoom("wellness");
     } else {
@@ -116,10 +126,17 @@ export function App() {
       <div className="wide-ocean" aria-hidden="true"><i /><i /><i /></div>
       <main className="game-shell" data-testid="game-shell">
         <StatusBar needs={needs} />
-        <GameRoom room={currentRoom} keeperName={profile.name} immersive={Boolean(activeMiniGame)}>
-          <GameCanvas room={currentRoom} theme={roomTheme} equipped={equipped} appearance={profile} reducedMotion={settings.reducedMotion} oceanMode={oceanMode} oceanZone={oceanZone} activeMiniGame={activeMiniGame} onMiniGameFinish={handleMiniGameFinish} onBathComplete={handleBathComplete} onBathProgress={handleBathProgress} />
+        <GameRoom room={currentRoom} petName={profile.name} immersive={Boolean(activeMiniGame)}>
+          {!activeMiniGame && isHomeInterior(currentRoom)
+            ? <Suspense fallback={<div className="home3d-loading" role="status">3D 집을 여는 중...</div>}><Home3DCanvas currentRoom={currentRoom} equipped={equipped} appearance={profile} reducedMotion={settings.reducedMotion} tired={needs.energy < 25} onRoomChange={(room) => {
+                  if (room === "wellness") { setOceanMode("exploration"); setOceanZone("beach"); }
+                  setBathProgress(0);
+                  setRoom(room);
+                }} /></Suspense>
+            : <GameCanvas room={currentRoom} theme={roomTheme} equipped={equipped} appearance={profile} reducedMotion={settings.reducedMotion} oceanMode={oceanMode} oceanZone={oceanZone} oceanGear={ownsOceanGear(inventory)} activeMiniGame={activeMiniGame} onMiniGameFinish={handleMiniGameFinish} onBathComplete={handleBathComplete} onBathProgress={handleBathProgress} />}
+          {!activeMiniGame && currentRoom === "studio" && <div className="home-control-hint"><span>☝</span><strong>3D 바닥을 눌러 걷기</strong><small>문을 누르면 열고 이동해요</small></div>}
           {!activeMiniGame && currentRoom !== "studio" && currentRoom !== "wellness" && <ContextTray room={currentRoom} bathProgress={bathProgress} />}
-          {!activeMiniGame && currentRoom === "wellness" && <OceanHub mode={oceanMode} zone={oceanZone} highScores={highScores} onModeChange={setOceanMode} onZoneChange={setOceanZone} onStartGame={(id) => void startGame(id)} onOpenShop={() => setOverlay("shop")} />}
+          {!activeMiniGame && currentRoom === "wellness" && <OceanHub mode={oceanMode} zone={oceanZone} highScores={highScores} oceanGear={ownsOceanGear(inventory)} onModeChange={setOceanMode} onZoneChange={setOceanZone} onStartGame={(id) => void startGame(id)} onOpenShop={() => setOverlay("shop")} />}
           {activeMiniGame && <MiniGameOverlay id={activeMiniGame} result={pendingResult} debug={debug} onClaim={claimReward} onExit={() => { const returnRoom = isOceanGame(activeMiniGame) ? "wellness" : "game-room"; setPendingResult(null); setActiveMiniGame(null); setRoom(returnRoom); }} />}
         </GameRoom>
         <RoomNav current={currentRoom} onChange={changeRoom} />
