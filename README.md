@@ -1,11 +1,13 @@
 # D ha · 디하
 
-사람 형태의 `디하` 캐릭터와 일상을 돌보는 모바일 우선 로컬 게임입니다. 네 상태를 살피고 7개 공간을 오가며, Ocean의 연속된 바다 생태계를 탐험해 코인과 경험치를 얻습니다. 의료 서비스나 실제 웰니스 연동처럼 보이지 않도록 게임 시스템과 미래 통합 경계를 분리했습니다.
+사람 형태의 `디하` 캐릭터와 일상을 돌보는 모바일 우선 게임입니다. 네 상태를 살피고 7개 공간을 오가며, Ocean의 연속된 바다 생태계를 탐험해 코인과 경험치를 얻습니다. 의료 서비스나 실제 웰니스 연동처럼 보이지 않도록 게임 시스템과 미래 통합 경계를 분리했습니다.
 
 ## 현재 구현 범위
 
 - 선글라스를 쓴 알약 디하의 첫 인사, 이름·6개 피부색·8개 머리 스타일·6개 머리 색상·4개 안경 스타일을 고르는 온보딩
 - 생성 미리보기와 실제 캐릭터·미니게임 플레이어가 동일한 외형 값을 사용하며, 기본 복장은 흰 반팔·청바지·흰 운동화
+- 캐릭터 설정 직후 Google 로그인, Firebase Auth 세션 유지, 설정 화면의 계정·동기화 상태와 로그아웃
+- Google UID별 Firestore 클라우드 저장과 UID별 IndexedDB/localStorage 로컬 복사본
 - 포만감·청결·에너지·즐거움·컨디션의 시간 경과 및 최대 24시간 오프라인 계산
 - Home, Kitchen, Ocean, Bathroom, Bedroom, Closet, Workout의 7개 공간과 Ocean 전용 탐험 허브
 - 밥·영양제·운동·에너지 4개 현재 상태만 표시하는 HUD와 자연스러운 인체 비율·호흡·눈깜빡임을 갖춘 디하
@@ -17,7 +19,7 @@
 - 물고기를 직접 잡으면 제품 없이 게임 속 DHA 섭취 효과가 포만·컨디션에 반영되는 바다 수영
 - 코인, XP, 레벨, 해금, 39개 아이템, 의상 장착, 4개 방 테마
 - 12개 업적, 일일 목표, 연속 방문, 로컬 데모 친구
-- IndexedDB 저장, 동기 localStorage 미러, Zod 검증, v1/v2/v3→v4 마이그레이션, JSON 내보내기·가져오기
+- 계정별 IndexedDB 저장, 동기 localStorage 미러, Zod 검증, v1/v2/v3→v4 마이그레이션, JSON 내보내기·가져오기
 - PWA 앱 셸, 오프라인 재실행, 업데이트 배너, 설치 가능한 manifest
 - 사운드·진동·알림·음성 에코 어댑터와 접근성용 Canvas 외부 컨트롤
 
@@ -61,7 +63,7 @@ src/components       온보딩·게임 UI·설정
 src/domain           상태·경제·성장·업적·아이템 순수 로직
 src/game             Phaser 엔티티·Scene·명시적 bridge
 src/minigames        지연 로딩 미니게임 정의
-src/platform         알림·소셜·웰니스·제품·오디오 어댑터
+src/platform         인증·클라우드 저장·알림·소셜·웰니스·제품·오디오 어댑터
 src/store            Zustand, IndexedDB, 검증·마이그레이션
 src/test             Vitest 단위 테스트
 e2e                  Playwright 사용자 흐름
@@ -69,7 +71,21 @@ e2e                  Playwright 사용자 흐름
 
 ## 저장 방식
 
-정본은 기존 설치와 호환되는 `diha-keeper` IndexedDB의 `game-save/primary` 레코드입니다. 행동 직후 새로고침에도 안전하도록 v4 데이터를 `diha-primary-v4` localStorage 키에 동기 미러하고, 로드할 때 `lastSavedAt`이 더 최신인 유효 데이터를 선택합니다. 모든 가져오기와 이전 버전 저장은 Zod 스키마를 통과해야 하며, 손상 데이터는 초기화 전 다운로드 가능한 백업으로 남깁니다. 서버 계정 동기화는 현재 구현하지 않았습니다.
+로그인 전 생성 데이터는 기존 설치와 호환되는 `diha-keeper` IndexedDB의 `game-save/primary` 레코드에 임시 저장됩니다. Google 로그인 후에는 `game-save/user:{uid}`와 `diha-save-v5:user:{uid}`로 분리되며, Firestore의 `users/{uid}/game/primary` 문서와 동기화됩니다. 최초 로그인에만 기존 `primary` 저장을 해당 UID로 옮기고 게스트 원본을 제거하므로 다음 계정으로 데이터가 넘어가지 않습니다.
+
+같은 계정의 로컬·클라우드 저장이 모두 있으면 `lastSavedAt`이 최신인 유효본을 선택합니다. 네트워크 장애 중에도 UID별 로컬 복사본에 먼저 저장하고 다음 연결 시 클라우드에 반영합니다. 모든 클라우드·가져오기·이전 버전 데이터는 Zod v4 스키마를 통과해야 하며, 손상 데이터는 초기화 전 다운로드 가능한 백업으로 남깁니다.
+
+Firebase 프로젝트는 `d-ha-game`, Firestore 기본 데이터베이스는 서울 `asia-northeast3` Standard이며 삭제 보호를 사용합니다. `firestore.rules`는 인증된 사용자가 자신의 UID 문서만 읽고 쓰도록 제한합니다. Firebase 웹 설정값은 공개 식별자이며 실제 접근 권한은 Firebase Authentication과 Firestore Security Rules가 통제합니다.
+
+## Firebase 관리
+
+보안 규칙을 변경한 뒤에는 다음 명령으로 D ha 전용 프로젝트에만 배포합니다.
+
+```bash
+npx firebase-tools deploy --only firestore --project d-ha-game
+```
+
+Google 제공자는 Firebase Authentication에서 활성화되어 있으며 공식 주소 `d-ha.vercel.app`이 허용 도메인에 등록되어 있습니다. 다른 Firebase 프로젝트를 이 저장소의 배포 대상으로 사용하지 않습니다.
 
 ## PWA 설치
 
@@ -85,7 +101,7 @@ Production 또는 로컬 HTTPS 환경에서 브라우저의 “앱 설치” 메
 
 ## 알려진 제한
 
-- 백엔드, 계정 동기화, 실제 사용자 친구, 서버 Push는 없습니다.
+- 실제 사용자 친구와 서버 Push는 아직 없습니다.
 - 음성 에코는 브라우저 `MediaRecorder`와 Web Audio 지원 범위에서만 동작하며 녹음을 저장하지 않습니다.
 - Phaser가 초기 게임 화면에 필요해 vendor 청크가 크지만, 미니게임 Scene과 정의는 최초 진입 전까지 별도 청크로 지연 로딩합니다.
 - 해안도로는 Ocean에서 바다 탐험과 분리된 두 번째 트랙으로 자리만 마련했으며, 차량·조작·코스는 다음 설계 입력 이후 구현합니다.
@@ -93,4 +109,4 @@ Production 또는 로컬 HTTPS 환경에서 브라우저의 “앱 설치” 메
 
 ## 향후 디하 확장
 
-QR 제품 활성화, serving 수량, 섭취 루틴, 디하·웰니스 데이터, 모바일 로컬 알림, 계정 동기화, 실제 친구는 `src/platform` 인터페이스 뒤에서 교체합니다. 세부 경계는 [INTEGRATION_BOUNDARIES.md](./INTEGRATION_BOUNDARIES.md), 모바일 전환은 [MOBILE_MIGRATION.md](./MOBILE_MIGRATION.md)를 참고합니다.
+QR 제품 활성화, serving 수량, 섭취 루틴, 디하·웰니스 데이터, 모바일 로컬 알림과 실제 친구는 `src/platform` 인터페이스 뒤에서 교체합니다. 세부 경계는 [INTEGRATION_BOUNDARIES.md](./INTEGRATION_BOUNDARIES.md), 모바일 전환은 [MOBILE_MIGRATION.md](./MOBILE_MIGRATION.md)를 참고합니다.

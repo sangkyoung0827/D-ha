@@ -4,6 +4,7 @@ import { ITEM_CATALOG } from "../../domain/catalog";
 import type { ItemCategory, RoomId } from "../../domain/types";
 import { gameBridge } from "../../game/bridge/GameBridge";
 import { playFeedbackTone, vibrateFeedback } from "../../platform/audio/feedback";
+import { useAccount } from "../../platform/auth/AccountProvider";
 import { notificationProvider } from "../../platform/notification/NotificationProvider";
 import { socialProvider, type GameFriend } from "../../platform/social/SocialProvider";
 import { useGameStore } from "../../store/gameStore";
@@ -122,7 +123,7 @@ function roomShopTitle(room: RoomId): string {
 function InventoryOverlay() {
   const inventory = useGameStore((state) => state.inventory);
   const owned = ITEM_CATALOG.filter((item) => (inventory[item.id] ?? 0) > 0);
-  return <><SheetHeader eyebrow="LOCAL INVENTORY" title="보관함" copy="구매·사용·장착 정보는 IndexedDB에 저장됩니다." /><div className="inventory-list">{owned.map((item) => <article key={item.id}><i style={{ background: item.color }}>{item.symbol}</i><span><strong>{item.name}</strong><small>{CATEGORY_LABELS[item.category]} · {item.description}</small></span><b>{inventory[item.id]}개</b></article>)}</div></>;
+  return <><SheetHeader eyebrow="PLAYER INVENTORY" title="보관함" copy="구매·사용·장착 정보는 현재 Google 계정에 분리 저장됩니다." /><div className="inventory-list">{owned.map((item) => <article key={item.id}><i style={{ background: item.color }}>{item.symbol}</i><span><strong>{item.name}</strong><small>{CATEGORY_LABELS[item.category]} · {item.description}</small></span><b>{inventory[item.id]}개</b></article>)}</div></>;
 }
 
 function WardrobeOverlay() {
@@ -188,7 +189,15 @@ function SettingsOverlay() {
     update({ notifications: result === "granted" });
     setPermissionMessage(result === "granted" ? "브라우저 알림을 허용했어요." : result === "unsupported" ? "이 브라우저는 알림을 지원하지 않아요." : "알림 권한이 허용되지 않았어요.");
   };
-  return <><SheetHeader eyebrow="LOCAL FIRST" title="설정과 데이터" copy="개인정보·의료정보를 서버로 전송하지 않습니다." /><div className="settings-list"><Toggle label="사운드" detail="짧은 게임 피드백 음" checked={settings.sound} onChange={(sound) => update({ sound })} /><Toggle label="진동 효과" detail="지원 기기에서만 동작" checked={settings.vibration} onChange={(vibration) => update({ vibration })} /><Toggle label="애니메이션 감소" detail="큰 움직임과 반복 모션 축소" checked={settings.reducedMotion} onChange={(reducedMotion) => update({ reducedMotion })} /></div><section className="settings-section"><div><h3>브라우저 알림</h3><p>버튼을 눌렀을 때만 권한을 요청합니다. 서버 Push는 사용하지 않습니다.</p>{permissionMessage && <small>{permissionMessage}</small>}</div><button className="secondary-button" onClick={requestNotifications}>알림 권한 요청</button></section><VoiceEchoPanel /><section className="settings-section data-actions"><div><h3>저장 데이터</h3><p>Zod 검증을 통과한 JSON만 가져옵니다.</p></div><button className="secondary-button" data-testid="export-save" onClick={download}>JSON 내보내기</button><label className="secondary-button file-button">JSON 가져오기<input type="file" accept="application/json" onChange={importFile} data-testid="import-save" /></label><button className="danger-button" onClick={() => { if (window.confirm("현재 게임을 초기화할까요? 내보낸 백업 외에는 복구할 수 없습니다.")) void resetGame(); }}>게임 초기화</button></section></>;
+  return <><SheetHeader eyebrow="PLAYER CLOUD" title="설정과 데이터" copy="게임 진행은 로그인한 사용자 UID별로 분리 저장됩니다." /><AccountSettings /><div className="settings-list"><Toggle label="사운드" detail="짧은 게임 피드백 음" checked={settings.sound} onChange={(sound) => update({ sound })} /><Toggle label="진동 효과" detail="지원 기기에서만 동작" checked={settings.vibration} onChange={(vibration) => update({ vibration })} /><Toggle label="애니메이션 감소" detail="큰 움직임과 반복 모션 축소" checked={settings.reducedMotion} onChange={(reducedMotion) => update({ reducedMotion })} /></div><section className="settings-section"><div><h3>브라우저 알림</h3><p>버튼을 눌렀을 때만 권한을 요청합니다. 서버 Push는 사용하지 않습니다.</p>{permissionMessage && <small>{permissionMessage}</small>}</div><button className="secondary-button" onClick={requestNotifications}>알림 권한 요청</button></section><VoiceEchoPanel /><section className="settings-section data-actions"><div><h3>저장 데이터</h3><p>현재 계정의 데이터만 내보내거나 가져옵니다. Zod 검증을 통과한 JSON만 허용합니다.</p></div><button className="secondary-button" data-testid="export-save" onClick={download}>JSON 내보내기</button><label className="secondary-button file-button">JSON 가져오기<input type="file" accept="application/json" onChange={importFile} data-testid="import-save" /></label><button className="danger-button" onClick={() => { if (window.confirm("현재 계정의 게임을 초기화할까요? 내보낸 백업 외에는 복구할 수 없습니다.")) void resetGame(); }}>게임 초기화</button></section></>;
+}
+
+function AccountSettings() {
+  const { account, busy, signOut } = useAccount();
+  const syncStatus = useGameStore((state) => state.syncStatus);
+  const syncMessage = useGameStore((state) => state.syncMessage);
+  if (!account) return null;
+  return <section className="settings-account" data-testid="settings-account"><span className="account-avatar">{account.photoUrl ? <img src={account.photoUrl} alt="" referrerPolicy="no-referrer" /> : account.displayName.slice(0, 1)}</span><span><strong>{account.displayName}</strong><small>{account.email}</small><em className={`cloud-state ${syncStatus}`}>{syncMessage ?? "계정별 저장 사용 중"}</em></span><button className="secondary-button" disabled={busy} onClick={() => void signOut()}>로그아웃</button></section>;
 }
 
 function Toggle({ label, detail, checked, onChange }: { label: string; detail: string; checked: boolean; onChange(value: boolean): void }) {

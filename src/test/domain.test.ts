@@ -20,6 +20,8 @@ import { migrateSave, parseImportedSave } from "../store/migrations";
 import { isOceanGame, isOceanZoneUnlocked, oceanGameNeedEffects } from "../domain/ocean";
 import { GLASSES_STYLES, HAIR_COLORS, HAIR_STYLES, SKIN_TONES } from "../domain/appearance";
 import { ITEM_BY_ID } from "../domain/catalog";
+import { newestAccountSave } from "../store/accountSave";
+import { persistenceKeyForOwner } from "../store/persistence";
 
 const start = new Date("2026-08-01T00:00:00.000Z");
 
@@ -165,5 +167,25 @@ describe("진행 데이터", () => {
     expect(invalid.status).toBe("corrupt");
     expect(invalid.save.version).toBe(4);
     expect(invalid.save.coins).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("계정별 저장", () => {
+  it("Google UID마다 독립적인 로컬 저장 키를 사용한다", () => {
+    expect(persistenceKeyForOwner(null)).toBe("primary");
+    expect(persistenceKeyForOwner("google-user-a")).toBe("user:google-user-a");
+    expect(persistenceKeyForOwner("google-user-b")).toBe("user:google-user-b");
+    expect(persistenceKeyForOwner("google-user-a")).not.toBe(persistenceKeyForOwner("google-user-b"));
+  });
+
+  it("같은 계정에서는 가장 최근의 유효한 로컬·클라우드 저장을 선택한다", () => {
+    const local = createDefaultSave(start);
+    const cloud = { ...local, coins: 940, lastSavedAt: "2026-08-01T03:00:00.000Z" };
+    const selected = newestAccountSave(
+      { status: "valid", save: local },
+      { status: "valid", save: cloud }
+    );
+
+    expect(selected?.save.coins).toBe(940);
   });
 });

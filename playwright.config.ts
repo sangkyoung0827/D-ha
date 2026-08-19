@@ -17,7 +17,7 @@ export default defineConfig({
     { name: "mobile-chromium", use: { ...devices["Pixel 7"] } }
   ],
   webServer: {
-    command: "./node_modules/.bin/tsc -b && ./node_modules/.bin/vite build && ./node_modules/.bin/vite preview --host 127.0.0.1",
+    command: "VITE_DIHA_E2E_AUTH=true ./node_modules/.bin/tsc -b && VITE_DIHA_E2E_AUTH=true ./node_modules/.bin/vite build && ./node_modules/.bin/vite preview --host 127.0.0.1",
     url: "http://127.0.0.1:4173",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000

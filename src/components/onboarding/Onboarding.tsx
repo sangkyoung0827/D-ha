@@ -11,6 +11,8 @@ import {
 } from "../../domain/appearance";
 import type { CharacterProfile } from "../../domain/types";
 import { useGameStore } from "../../store/gameStore";
+import { useAccount } from "../../platform/auth/AccountProvider";
+import { GoogleSignInScreen } from "../auth/GoogleSignInScreen";
 import { GameIcon } from "../icons/GameIcon";
 
 type PreviewStyle = CSSProperties & { "--skin": string; "--hair": string };
@@ -19,10 +21,17 @@ export function Onboarding() {
   const profile = useGameStore((state) => state.profile);
   const createKeeper = useGameStore((state) => state.createKeeper);
   const finishTutorial = useGameStore((state) => state.finishTutorial);
-  const [step, setStep] = useState<"intro" | "create" | "tour">("intro");
+  const hydratedOwner = useGameStore((state) => state.hydratedOwner);
+  const syncStatus = useGameStore((state) => state.syncStatus);
+  const { status: accountStatus, account } = useAccount();
+  const [step, setStep] = useState<"intro" | "create" | "account" | "tour">("intro");
   const [draft, setDraft] = useState<CharacterProfile>(profile);
 
-  if (step === "intro") {
+  const visibleStep = step === "account" && accountStatus === "signed-in" && account && hydratedOwner === `user:${account.uid}` && syncStatus !== "syncing"
+    ? "tour"
+    : step;
+
+  if (visibleStep === "intro") {
     return (
       <main className="onboarding ocean-gradient diha-intro" data-testid="onboarding">
         <div className="onboarding-orbit" aria-hidden="true"><span /><span /><span /></div>
@@ -34,12 +43,12 @@ export function Onboarding() {
         </div>
         <div className="mascot-speech" role="status"><strong>안녕!</strong><span>나는 디하야. 우리 함께 새로운 일상을 시작해볼까?</span></div>
         <button className="primary-button wide" onClick={() => setStep("create")}>디하 시작하기</button>
-        <small>의료 서비스가 아닌 가상 게임입니다. 데이터는 이 브라우저에 저장됩니다.</small>
+        <small>의료 서비스가 아닌 가상 게임입니다. 생성 후 Google 계정에 안전하게 저장합니다.</small>
       </main>
     );
   }
 
-  if (step === "create") {
+  if (visibleStep === "create") {
     const previewStyle: PreviewStyle = { "--skin": skinColor(draft.skinTone), "--hair": hairColor(draft.hairColor) };
     return (
       <main className="onboarding create-screen" data-testid="character-creator">
@@ -70,10 +79,12 @@ export function Onboarding() {
         <Picker label="머리 스타일" options={HAIR_STYLES} value={draft.hairStyle} onChange={(hairStyle) => setDraft({ ...draft, hairStyle })} />
         <Picker label="머리 색상" options={HAIR_COLORS} value={draft.hairColor} onChange={(hairColor) => setDraft({ ...draft, hairColor })} />
         <Picker label="안경" options={GLASSES_STYLES} value={draft.glassesStyle} onChange={(glassesStyle) => setDraft({ ...draft, glassesStyle })} />
-        <button className="primary-button wide create-submit" disabled={!draft.name.trim()} onClick={() => { createKeeper({ ...draft, name: draft.name.trim() }); setStep("tour"); }}>이 모습으로 시작</button>
+        <button className="primary-button wide create-submit" disabled={!draft.name.trim()} onClick={() => { createKeeper({ ...draft, name: draft.name.trim() }); setStep(accountStatus === "signed-in" ? "tour" : "account"); }}>이 모습으로 시작</button>
       </main>
     );
   }
+
+  if (visibleStep === "account") return <GoogleSignInScreen profile={profile} />;
 
   return (
     <main className="onboarding tour-screen">

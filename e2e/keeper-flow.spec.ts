@@ -26,6 +26,9 @@ async function createKeeper(page: Page, name = "마루") {
   await expect(page.getByTestId("character-preview")).toHaveAttribute("data-glasses-style", "round");
   await expect(page.getByText("기본 복장 · 흰 반팔 + 청바지")).toBeVisible();
   await page.getByRole("button", { name: "이 모습으로 시작" }).click();
+  await expect(page.getByTestId("account-gate")).toBeVisible();
+  await expect(page.getByText("계정별 독립 저장")).toBeVisible();
+  await page.getByRole("button", { name: "Google로 계속" }).click();
   await expect(page.getByText("돌보고, 놀고,")).toBeVisible();
   await page.getByRole("button", { name: /Home 입장/ }).click();
   await expect(page.getByTestId("game-shell")).toBeVisible();
@@ -34,12 +37,6 @@ async function createKeeper(page: Page, name = "마루") {
 
 async function goToRoom(page: Page, room: string) {
   await page.getByRole("navigation", { name: "방 이동" }).getByRole("button", { name: new RegExp(room) }).click();
-}
-
-async function clickGamePoint(page: Page, x: number, y: number) {
-  const box = await page.locator("canvas").boundingBox();
-  if (!box) throw new Error("게임 캔버스 좌표를 찾지 못했습니다.");
-  await page.mouse.click(box.x + x * (box.width / 390), box.y + y * (box.height / 700));
 }
 
 test.beforeEach(async ({ context }) => {
@@ -52,8 +49,7 @@ test("캐릭터 생성부터 돌봄, 미니게임, 구매, 장착과 새로고�
   await expect(page.getByText("마루", { exact: true })).toBeVisible();
 
   await goToRoom(page, "주방");
-  await page.waitForTimeout(320);
-  await clickGamePoint(page, 65, 218);
+  await page.getByTestId("open-fridge").click();
   await expect(page.getByTestId("fridge-overlay")).toBeVisible();
   await expect(page.locator(".fridge-grid > button")).toHaveCount(9);
   await expect(page.getByTestId("fridge-food-sea-bowl").getByText("×3")).toBeVisible();
@@ -100,6 +96,7 @@ test("저장 JSON 내보내기와 가져오기가 검증된 데이터 경로를 
   await createKeeper(page, "백업이");
   await page.getByText("DEV", { exact: true }).click();
   await page.getByRole("button", { name: "설정 열기" }).click();
+  await expect(page.getByTestId("settings-account")).toContainText("player@example.com");
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByTestId("export-save").click();

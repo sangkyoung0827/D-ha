@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ownsSave(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validSave(userId) {
+      return request.resource.data.keys().hasOnly([
+          'ownerId',
+          'schemaVersion',
+          'save',
+          'updatedAt'
+        ])
+        && request.resource.data.ownerId == userId
+        && request.resource.data.schemaVersion == 4
+        && request.resource.data.save is map;
+    }
+
+    match /users/{userId}/game/{saveId} {
+      allow read: if saveId == 'primary' && ownsSave(userId);
+      allow create, update: if saveId == 'primary' && ownsSave(userId) && validSave(userId);
+      allow delete: if saveId == 'primary' && ownsSave(userId);
+    }
+  }
+}

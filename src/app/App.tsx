@@ -15,9 +15,13 @@ import { GameRoom } from "../components/game-ui/GameRoom";
 import { OceanHub } from "../components/game-ui/OceanHub";
 import { OCEAN_ZONES, isOceanGame, oceanZoneForGame, type OceanMode, type OceanZoneId } from "../domain/ocean";
 import { startPwaUpdate } from "../platform/pwa/update";
+import { useAccount } from "../platform/auth/AccountProvider";
+import { GoogleSignInScreen } from "../components/auth/GoogleSignInScreen";
 
 export function App() {
   const hydrated = useGameStore((state) => state.hydrated);
+  const hydratedOwner = useGameStore((state) => state.hydratedOwner);
+  const syncStatus = useGameStore((state) => state.syncStatus);
   const hydrate = useGameStore((state) => state.hydrate);
   const tutorialComplete = useGameStore((state) => state.tutorialComplete);
   const profile = useGameStore((state) => state.profile);
@@ -43,9 +47,18 @@ export function App() {
   const [pendingResult, setPendingResult] = useState<MiniGameResult | null>(null);
   const [oceanMode, setOceanMode] = useState<OceanMode>("exploration");
   const [oceanZone, setOceanZone] = useState<OceanZoneId>("beach");
+  const { status: accountStatus, account } = useAccount();
   const debug = new URLSearchParams(window.location.search).get("debug") === "1";
 
-  useEffect(() => { if (!useGameStore.getState().hydrated) void hydrate(); }, [hydrate]);
+  useEffect(() => {
+    if (accountStatus === "loading" || syncStatus === "syncing") return;
+    if (accountStatus === "signed-in" && account) {
+      const owner = `user:${account.uid}`;
+      if (hydratedOwner !== owner) void hydrate(account.uid);
+      return;
+    }
+    if (hydratedOwner === null) void hydrate(null);
+  }, [accountStatus, account, hydrate, hydratedOwner, syncStatus]);
   useEffect(() => startPwaUpdate(), []);
   useEffect(() => {
     if (!toast) return;
@@ -93,8 +106,10 @@ export function App() {
     setBathProgress(0);
   };
 
-  if (!hydrated) return <main className="loading-screen"><div className="loading-orbit" /><p>디하를 깨우는 중...</p></main>;
+  if (!hydrated || (accountStatus === "loading" && hydratedOwner === null)) return <main className="loading-screen"><div className="loading-orbit" /><p>디하를 깨우는 중...</p></main>;
   if (!tutorialComplete) return <Onboarding />;
+  if (accountStatus !== "signed-in" || !account) return <GoogleSignInScreen profile={profile} returning />;
+  if (hydratedOwner !== `user:${account.uid}`) return <main className="loading-screen"><div className="loading-orbit" /><p>계정 항해를 불러오는 중...</p></main>;
 
   return (
     <div className={`app-background theme-${roomTheme} ${settings.reducedMotion ? "reduced-motion" : ""}`}>

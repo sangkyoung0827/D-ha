@@ -7,6 +7,7 @@ import { progressDailyGoal, refreshDailyGoals, updateBalancedGoal, localDateKey 
 import { calculateMiniGameReward, canPurchase, spendCoins } from "../domain/economy";
 import { levelFromXp, LEVEL_THRESHOLDS } from "../domain/progression";
 import { isOceanGame, oceanCompletionCopy, oceanGameNeedEffects } from "../domain/ocean";
+import { loadCloudGame, saveCloudGame } from "../platform/cloud/FirebaseGameSaveProvider";
 import type {
   CharacterProfile,
   GameNotification,
@@ -19,11 +20,15 @@ import type {
 } from "../domain/types";
 import { clearGame, loadGame, saveGame } from "./persistence";
 import { parseImportedSave } from "./migrations";
+import { newestAccountSave } from "./accountSave";
 
 export type OverlayId = "none" | "fridge" | "inventory" | "shop" | "wardrobe" | "achievements" | "friends" | "settings" | "daily" | "notifications";
 
 interface GameRuntime {
   hydrated: boolean;
+  hydratedOwner: string | null;
+  syncStatus: "idle" | "syncing" | "synced" | "error";
+  syncMessage: string | null;
   currentRoom: RoomId;
   overlay: OverlayId;
   recoveryMessage: string | null;
@@ -33,7 +38,7 @@ interface GameRuntime {
 }
 
 interface GameActions {
-  hydrate(): Promise<void>;
+  hydrate(userId?: string | null): Promise<void>;
   createKeeper(profile: CharacterProfile): void;
   finishTutorial(): void;
   setRoom(room: RoomId): void;
@@ -152,19 +157,64 @@ function dayDistance(a: string, b: string): number {
   );
 }
 
+function ownerLabel(userId: string | null): string {
+  return userId ? `user:${userId}` : "guest";
+}
+
+function prepareHydratedSave(save: GameSave, previous: GameSave, now: Date): GameSave {
+  const elapsed = applyElapsedTime(save.needs, save.lastSavedAt, now);
+  const today = localDateKey(now);
+  const distance = dayDistance(save.lastLoginDate, today);
+  let prepared: GameSave = {
+    ...save,
+    needs: elapsed.needs,
+    dailyDate: refreshDailyGoals(save.dailyDate, save.dailyGoals, now).date,
+    dailyGoals: refreshDailyGoals(save.dailyDate, save.dailyGoals, now).goals,
+    loginStreak: distance === 1 ? save.loginStreak + 1 : distance > 1 ? 1 : save.loginStreak,
+    lastLoginDate: today,
+    lastSavedAt: now.toISOString()
+  };
+  if (elapsed.elapsedHours >= 1) {
+    prepared = addNotification(prepared, {
+      title: "다시 만나서 반가워요",
+      body: "오늘부터 천천히 이어가요. 바다는 그대로 기다리고 있어요.",
+      kind: "return"
+    });
+  }
+  return finalizeSave(prepared, previous, now);
+}
+
 const initial = createDefaultSave();
+let activeUserId: string | null = null;
+let cloudWriteQueue = Promise.resolve();
 
 export const useGameStore = create<GameStore>((set, get) => {
+  const persist = async (save: GameSave, userId = activeUserId) => {
+    await saveGame(save, userId);
+    if (!userId) return;
+    set({ syncStatus: "syncing", syncMessage: "Google 계정에 저장하는 중..." });
+    cloudWriteQueue = cloudWriteQueue.catch(() => undefined).then(() => saveCloudGame(userId, save));
+    try {
+      await cloudWriteQueue;
+      if (activeUserId === userId) set({ syncStatus: "synced", syncMessage: "Google 계정에 안전하게 저장됨" });
+    } catch {
+      if (activeUserId === userId) set({ syncStatus: "error", syncMessage: "클라우드 저장 대기 중 · 기기에는 저장됨" });
+    }
+  };
+
   const commit = (producer: (save: GameSave) => GameSave, toast?: string) => {
     const previous = saveFromStore(get());
     const next = finalizeSave(producer(previous), previous);
     set({ ...next, toast: toast ?? get().toast });
-    void saveGame(next);
+    void persist(next);
   };
 
   return {
     ...initial,
     hydrated: false,
+    hydratedOwner: null,
+    syncStatus: "idle",
+    syncMessage: null,
     currentRoom: "studio",
     overlay: "none",
     recoveryMessage: null,
@@ -172,43 +222,57 @@ export const useGameStore = create<GameStore>((set, get) => {
     activeMiniGame: null,
     toast: null,
 
-    async hydrate() {
-      const result = await loadGame();
+    async hydrate(userId = null) {
+      const requestedOwner = ownerLabel(userId);
+      if (get().syncStatus === "syncing") return;
+      set({ syncStatus: "syncing", syncMessage: userId ? "계정 저장을 불러오는 중..." : null });
+
+      const localResult = await loadGame(userId);
+      let result = localResult;
+      let cloudError = false;
+      let clearGuestAfterBinding = false;
+      if (userId) {
+        try {
+          result = newestAccountSave(localResult, await loadCloudGame(userId));
+        } catch {
+          cloudError = true;
+        }
+        const guestResult = await loadGame(null);
+        clearGuestAfterBinding = Boolean(guestResult);
+        if (!result && guestResult) {
+          result = guestResult;
+        }
+      }
+
       const now = new Date();
       let save = result?.save ?? createDefaultSave(now);
-      const elapsed = applyElapsedTime(save.needs, save.lastSavedAt, now);
-      const today = localDateKey(now);
-      const distance = dayDistance(save.lastLoginDate, today);
-      save = {
-        ...save,
-        needs: elapsed.needs,
-        dailyDate: refreshDailyGoals(save.dailyDate, save.dailyGoals, now).date,
-        dailyGoals: refreshDailyGoals(save.dailyDate, save.dailyGoals, now).goals,
-        loginStreak: distance === 1 ? save.loginStreak + 1 : distance > 1 ? 1 : save.loginStreak,
-        lastLoginDate: today,
-        lastSavedAt: now.toISOString()
-      };
-      if (elapsed.elapsedHours >= 1) {
-        save = addNotification(save, {
-          title: "다시 만나서 반가워요",
-          body: "오늘부터 천천히 이어가요. 바다는 그대로 기다리고 있어요.",
-          kind: "return"
-        });
-      }
-      save = finalizeSave(save, result?.save ?? save, now);
+      save = prepareHydratedSave(save, result?.save ?? save, now);
+      activeUserId = userId;
       set({
         ...save,
         hydrated: true,
+        hydratedOwner: requestedOwner,
+        syncStatus: cloudError ? "error" : userId ? "syncing" : "idle",
+        syncMessage: cloudError ? "클라우드에 연결하지 못했지만 기기 저장을 열었어요." : userId ? "Google 계정에 저장하는 중..." : null,
         recoveryMessage: result?.status === "corrupt" ? result.message ?? "저장 복구가 필요합니다." : null,
         recoveryBackup: result?.status === "corrupt" ? result.backup ?? null : null
       });
-      await saveGame(save);
+      await saveGame(save, userId);
+      if (clearGuestAfterBinding) await clearGame(null);
+      if (userId) {
+        try {
+          await saveCloudGame(userId, save);
+          set({ syncStatus: "synced", syncMessage: "Google 계정에 안전하게 저장됨" });
+        } catch {
+          set({ syncStatus: "error", syncMessage: "클라우드 저장 대기 중 · 기기에는 저장됨" });
+        }
+      }
     },
 
     createKeeper(profile) {
       const next = createDefaultSave(new Date(), profile);
       set({ ...next, hydrated: true, toast: `${profile.name}와의 첫 항해를 시작해요.` });
-      void saveGame(next);
+      void persist(next);
     },
 
     finishTutorial() {
@@ -413,15 +477,15 @@ export const useGameStore = create<GameStore>((set, get) => {
         return false;
       }
       set({ ...result.save, toast: "저장 데이터를 안전하게 가져왔어요." });
-      void saveGame(result.save);
+      void persist(result.save);
       return true;
     },
 
     async resetGame() {
-      await clearGame();
+      await clearGame(activeUserId);
       const next = createDefaultSave();
       set({ ...next, recoveryBackup: null, recoveryMessage: null, currentRoom: "studio", overlay: "none", toast: "새 게임을 준비했어요." });
-      await saveGame(next);
+      await persist(next);
     },
 
     demoAdvance(hours) {
