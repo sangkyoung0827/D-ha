@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "react";
-import { registerSW } from "virtual:pwa-register";
 import { GameCanvas } from "../game/GameCanvas";
 import { gameBridge } from "../game/bridge/GameBridge";
 import type { MiniGameResult, RoomId } from "../domain/types";
@@ -15,6 +14,7 @@ import { loadMiniGameDefinition } from "../minigames/core/loadDefinition";
 import { GameRoom } from "../components/game-ui/GameRoom";
 import { OceanHub } from "../components/game-ui/OceanHub";
 import { OCEAN_ZONES, isOceanGame, oceanZoneForGame, type OceanMode, type OceanZoneId } from "../domain/ocean";
+import { startPwaUpdate } from "../platform/pwa/update";
 
 export function App() {
   const hydrated = useGameStore((state) => state.hydrated);
@@ -46,9 +46,7 @@ export function App() {
   const debug = new URLSearchParams(window.location.search).get("debug") === "1";
 
   useEffect(() => { if (!useGameStore.getState().hydrated) void hydrate(); }, [hydrate]);
-  useEffect(() => {
-    registerSW({ immediate: true });
-  }, []);
+  useEffect(() => startPwaUpdate(), []);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(clearToast, 2400);

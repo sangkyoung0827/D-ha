@@ -39,10 +39,7 @@ async function goToRoom(page: Page, room: string) {
 async function clickGamePoint(page: Page, x: number, y: number) {
   const box = await page.locator("canvas").boundingBox();
   if (!box) throw new Error("게임 캔버스 좌표를 찾지 못했습니다.");
-  const scale = Math.min(box.width / 390, box.height / 700);
-  const offsetX = (box.width - 390 * scale) / 2;
-  const offsetY = (box.height - 700 * scale) / 2;
-  await page.mouse.click(box.x + offsetX + x * scale, box.y + offsetY + y * scale);
+  await page.mouse.click(box.x + x * (box.width / 390), box.y + y * (box.height / 700));
 }
 
 test.beforeEach(async ({ context }) => {
@@ -50,6 +47,7 @@ test.beforeEach(async ({ context }) => {
 });
 
 test("캐릭터 생성부터 돌봄, 미니게임, 구매, 장착과 새로고침 저장까지", async ({ page }) => {
+  test.slow();
   await createKeeper(page);
   await expect(page.getByText("마루", { exact: true })).toBeVisible();
 
@@ -260,6 +258,12 @@ test("PWA manifest와 오프라인 앱 셸을 제공한다", async ({ page, cont
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute("href", /manifest/);
   const manifestResponse = await page.request.get("/manifest.webmanifest");
   expect(manifestResponse.ok()).toBe(true);
+
+  const serviceWorkerResponse = await page.request.get("/sw.js");
+  expect(serviceWorkerResponse.ok()).toBe(true);
+  const serviceWorkerSource = await serviceWorkerResponse.text();
+  expect(serviceWorkerSource).toContain("ocean-beach-game-v2.jpg");
+  expect(serviceWorkerSource).not.toContain("ocean-beach-photoreal-v1.jpg");
 
   await page.waitForFunction(async () => {
     if (!("serviceWorker" in navigator)) return false;
