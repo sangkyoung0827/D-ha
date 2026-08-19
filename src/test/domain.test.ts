@@ -17,7 +17,16 @@ import {
 } from "../domain/economy";
 import { levelFromXp } from "../domain/progression";
 import { migrateSave, parseImportedSave } from "../store/migrations";
-import { OCEAN_GAME_BY_ID, OCEAN_RUN_CHAPTERS, isOceanGame, oceanGameNeedEffects } from "../domain/ocean";
+import {
+  OCEAN_GAME_BY_ID,
+  OCEAN_RUN_CHAPTERS,
+  OCEAN_RUN_HIT_GRACE_MS,
+  OCEAN_RUN_MAX_HEALTH,
+  OCEAN_RUN_OBSTACLE_MAX_SCALE,
+  isOceanGame,
+  oceanGameNeedEffects,
+  oceanRunHealthAfterHit
+} from "../domain/ocean";
 import { FUR_COLORS, PET_ACCESSORIES, PET_ANIMATIONS, PET_BREEDS, PET_COLLARS, PET_HATS, PET_OUTFITS, PET_PATTERNS } from "../domain/pet";
 import { ITEM_BY_ID } from "../domain/catalog";
 import { newestAccountSave } from "../store/accountSave";
@@ -92,6 +101,15 @@ describe("경제와 성장", () => {
 });
 
 describe("바다 생태계 진행", () => {
+  it("Ocean Run은 작은 장애물과 네 번의 충돌 여유를 제공한다", () => {
+    expect(OCEAN_RUN_OBSTACLE_MAX_SCALE).toBeLessThan(1);
+    expect(OCEAN_RUN_MAX_HEALTH).toBe(4);
+    expect(OCEAN_RUN_HIT_GRACE_MS).toBeGreaterThanOrEqual(1_500);
+    expect(oceanRunHealthAfterHit(OCEAN_RUN_MAX_HEALTH)).toBe(3);
+    expect(oceanRunHealthAfterHit(1)).toBe(0);
+    expect(oceanRunHealthAfterHit(0)).toBe(0);
+  });
+
   it("Ocean 게임 선택은 Ocean Run과 Jump Up 두 개만 제공한다", () => {
     expect(Array.from(OCEAN_GAME_BY_ID.keys())).toEqual(["ocean-run", "jump-up"]);
     expect(OCEAN_RUN_CHAPTERS.map((chapter) => chapter.id)).toEqual(["beach", "surf", "cave", "deepsea"]);

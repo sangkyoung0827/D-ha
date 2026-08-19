@@ -225,7 +225,7 @@ test("홈 하단 헤더 펫 연구원은 로그인 토큰으로 질문하고 논
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        answer: "반려견의 영양 상태는 개별 건강 상태와 식단을 함께 살펴야 합니다 [1].\n\n참고: 이 답변은 수의사의 진료를 대신하지 않습니다.",
+        answer: "## **반려견의 영양 상태**는 개별 건강 상태와 `식단`을 함께 살펴야 해요 [1].\n\n참고: 이 답변은 수의사의 진료를 대신하지 않습니다.",
         sources: [{
           id: "openalex:test",
           provider: "OpenAlex",
@@ -242,6 +242,9 @@ test("홈 하단 헤더 펫 연구원은 로그인 토큰으로 질문하고 논
   await researcher.getByLabel("펫 연구원에게 질문").fill("우리 강아지의 식단은 어떻게 확인해야 해?");
   await researcher.getByRole("button", { name: "질문 보내기" }).click();
   await expect(researcher.getByText(/영양 상태는 개별 건강 상태/)).toBeVisible();
+  await expect(researcher).not.toContainText("**");
+  await expect(researcher).not.toContainText("##");
+  await expect(researcher).not.toContainText("`식단`");
   await expect(researcher.getByRole("link", { name: /Companion animal nutrition review/ })).toHaveAttribute("href", "https://example.org/pet-study");
   expect(authorization).toBe("Bearer e2e-google-user");
 });

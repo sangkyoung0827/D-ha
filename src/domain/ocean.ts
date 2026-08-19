@@ -4,6 +4,14 @@ export type OceanMode = "exploration" | "coastal-road";
 export type OceanZoneId = "beach" | "open-water" | "surf" | "cave" | "deepsea";
 export type OceanRunChapterId = "beach" | "surf" | "cave" | "deepsea";
 
+export const OCEAN_RUN_MAX_HEALTH = 4;
+export const OCEAN_RUN_HIT_GRACE_MS = 1_600;
+export const OCEAN_RUN_OBSTACLE_MAX_SCALE = 0.82;
+
+export function oceanRunHealthAfterHit(health: number): number {
+  return Math.max(0, Math.floor(health) - 1);
+}
+
 export interface OceanGameInfo {
   id: MiniGameId;
   title: string;

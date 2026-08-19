@@ -7,6 +7,7 @@ import {
   type SupplementLifeStage,
   type SupplementRisk
 } from "../src/domain/supplementRecommendation.js";
+import { cleanResearchAnswer } from "../src/platform/research/plainText.js";
 
 const DEFAULT_NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1";
 const DEFAULT_NVIDIA_RESEARCH_MODEL = "nvidia/nemotron-3.5-lightning-30b-a3b";
@@ -429,13 +430,15 @@ async function generateGroundedAnswer(payload: PetResearchRequest, sources: Rese
         "질문의 동물 종과 직접 관련된 자료만 근거로 사용합니다. 사람이나 설치류 연구는 직접 근거로 표현하지 말고, 제공되더라도 간접 근거임을 명시합니다.",
         "초록이 없거나 근거가 부족하면 결론을 추측하지 말고 한계를 명확히 밝힙니다.",
         "수의학 질문은 일반 정보만 제공하며 진단·처방·투약량을 확정하지 않습니다. 응급 가능성이 있으면 즉시 동물병원이나 수의사 상담을 안내합니다.",
-        "답변은 친절하고 간결한 한국어로 작성하고, 마지막에 '참고: 이 답변은 수의사의 진료를 대신하지 않습니다.'를 덧붙입니다."
+        "보호자에게 다정하게 이야기하듯 쉽고 친근한 한국어 존댓말로 답합니다. 먼저 질문에 짧게 공감하고, 어려운 전문용어는 일상적인 표현으로 풀어 설명합니다.",
+        "별표, 밑줄, 해시, 백틱, 마크다운 제목이나 굵은 글씨 같은 꾸밈 문법은 사용하지 않습니다. 번호가 필요하면 1, 2, 3처럼 평문으로 씁니다.",
+        "답변은 간결하게 작성하고, 마지막에 '참고: 이 답변은 수의사의 진료를 대신하지 않습니다.'를 덧붙입니다."
       ].join("\n")
     },
     ...history,
     { role: "user", content: `반려동물 정보: ${petContext}\n\n질문: ${payload.question}\n\n검색된 연구자료:\n${evidence}` }
   ], 950, 0.2);
-  return stripThinking(answer);
+  return cleanResearchAnswer(stripThinking(answer));
 }
 
 function supplementReferenceSources(): ResearchSource[] {

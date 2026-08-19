@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import type { PetProfile } from "../../domain/pet";
 import { useAccount } from "../../platform/auth/AccountProvider";
+import { cleanResearchAnswer } from "../../platform/research/plainText";
 
 interface ChatSource {
   id: string;
@@ -74,7 +75,7 @@ export function PetResearchChat({ pet }: { pet: PetProfile }) {
       const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: "assistant",
-        content: body.answer,
+        content: cleanResearchAnswer(body.answer),
         sources: body.sources ?? []
       };
       setMessages((current) => [...current, assistantMessage].slice(-MAX_SAVED_MESSAGES));
@@ -129,7 +130,11 @@ function loadStoredMessages(uid: string | undefined): ChatMessage[] {
   if (!uid) return [];
   try {
     const saved = JSON.parse(localStorage.getItem(`diha:pet-research:${uid}`) || "[]") as unknown;
-    return Array.isArray(saved) ? saved.filter(isStoredMessage).slice(-MAX_SAVED_MESSAGES) : [];
+    return Array.isArray(saved)
+      ? saved.filter(isStoredMessage).slice(-MAX_SAVED_MESSAGES).map((message) => message.role === "assistant"
+        ? { ...message, content: cleanResearchAnswer(message.content) }
+        : message)
+      : [];
   } catch {
     return [];
   }
