@@ -31,3 +31,29 @@ test("앱 설치 공개 페이지와 검색엔진 파일이 정상 응답한다"
   expect(await sitemap.text()).toContain("https://d-ha.vercel.app/pet-health");
   expect((await icon.body()).byteLength).toBeGreaterThan(10_000);
 });
+
+test("원래 앱 화면에서 작은 다운로드 버튼이 네이티브 설치 창을 연다", async ({ page }) => {
+  await page.goto("/");
+  const downloadButton = page.getByRole("button", { name: "Diha 앱 다운로드" });
+  await expect(downloadButton).toBeVisible();
+  await expect(downloadButton).toContainText("앱 다운로드");
+
+  await page.evaluate(() => {
+    const installEvent = new Event("beforeinstallprompt", { cancelable: true });
+    Object.defineProperties(installEvent, {
+      prompt: {
+        value: async () => {
+          document.documentElement.dataset.installPromptCalled = "true";
+        }
+      },
+      userChoice: {
+        value: Promise.resolve({ outcome: "accepted", platform: "web" })
+      }
+    });
+    window.dispatchEvent(installEvent);
+  });
+
+  await downloadButton.click();
+  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.installPromptCalled)).toBe("true");
+  await expect(downloadButton).toBeHidden();
+});

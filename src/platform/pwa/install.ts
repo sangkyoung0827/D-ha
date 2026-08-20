@@ -28,6 +28,11 @@ export function shouldOfferIosGuide(): boolean {
     && !isStandaloneDisplay(window.matchMedia.bind(window), iosNavigator.standalone);
 }
 
+export function isPwaInstalled(): boolean {
+  const currentNavigator = navigator as Navigator & { standalone?: boolean };
+  return isStandaloneDisplay(window.matchMedia.bind(window), currentNavigator.standalone);
+}
+
 export function listenForPwaInstall(callbacks: {
   onPrompt(prompt: DeferredInstallPrompt): void;
   onInstalled(): void;

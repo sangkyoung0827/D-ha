@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  isPwaInstalled,
   listenForPwaInstall,
   requestPwaInstall,
   shouldOfferIosGuide,
@@ -9,8 +10,8 @@ import { startPwaUpdate } from "../../platform/pwa/update";
 
 export function PwaExperience() {
   const [installPrompt, setInstallPrompt] = useState<DeferredInstallPrompt | null>(null);
-  const [showIosGuide, setShowIosGuide] = useState(false);
-  const [installDismissed, setInstallDismissed] = useState(false);
+  const [installGuide, setInstallGuide] = useState<"ios" | "browser" | null>(null);
+  const [installed, setInstalled] = useState(isPwaInstalled);
   const [applyUpdate, setApplyUpdate] = useState<(() => Promise<void>) | null>(null);
   const [offlineReady, setOfflineReady] = useState(false);
 
@@ -18,8 +19,8 @@ export function PwaExperience() {
     onPrompt: setInstallPrompt,
     onInstalled: () => {
       setInstallPrompt(null);
-      setInstallDismissed(true);
-      setShowIosGuide(false);
+      setInstalled(true);
+      setInstallGuide(null);
     }
   }), []);
 
@@ -34,30 +35,36 @@ export function PwaExperience() {
     return () => window.clearTimeout(timer);
   }, [offlineReady]);
 
-  const installVisible = !installDismissed && (Boolean(installPrompt) || shouldOfferIosGuide());
-
   return <>
-    {installVisible && <aside className="pwa-install-card" aria-label="Diha 앱 설치">
-      <img src="/icon.svg" alt="" aria-hidden="true" />
-      <span><strong>Diha 설치하기</strong><small>홈 화면에서 바로 시작하세요</small></span>
-      <button type="button" onClick={async () => {
+    {!installed && <button className="pwa-download-button" type="button" onClick={async () => {
         if (installPrompt) {
           const outcome = await requestPwaInstall(installPrompt);
-          if (outcome === "accepted") setInstallPrompt(null);
+          if (outcome === "accepted") {
+            setInstallPrompt(null);
+            setInstalled(true);
+          }
           return;
         }
-        setShowIosGuide(true);
-      }}>설치</button>
-      <button type="button" className="pwa-card-close" aria-label="설치 안내 닫기" onClick={() => setInstallDismissed(true)}>×</button>
-    </aside>}
+        setInstallGuide(shouldOfferIosGuide() ? "ios" : "browser");
+      }} aria-label="Diha 앱 다운로드">
+        <span aria-hidden="true">↓</span>
+        앱 다운로드
+      </button>}
 
-    {showIosGuide && <div className="pwa-guide-backdrop" role="presentation" onClick={() => setShowIosGuide(false)}>
+    {installGuide && <div className="pwa-guide-backdrop" role="presentation" onClick={() => setInstallGuide(null)}>
       <section className="pwa-ios-guide" role="dialog" aria-modal="true" aria-labelledby="pwa-ios-title" onClick={(event) => event.stopPropagation()}>
         <img src="/icon.svg" alt="Diha 앱 아이콘" />
-        <p>IPHONE · IPAD</p>
-        <h2 id="pwa-ios-title">Diha를 홈 화면에 추가하기</h2>
-        <ol><li>Safari 아래의 <strong>공유</strong> 버튼을 누르세요.</li><li><strong>홈 화면에 추가</strong>를 선택하세요.</li><li>오른쪽 위의 <strong>추가</strong>를 누르면 완료됩니다.</li></ol>
-        <button type="button" onClick={() => setShowIosGuide(false)}>확인</button>
+        <p>{installGuide === "ios" ? "IPHONE · IPAD" : "APP INSTALL"}</p>
+        <h2 id="pwa-ios-title">Diha 앱 다운로드</h2>
+        {installGuide === "ios" ? <ol>
+          <li>브라우저의 <strong>공유</strong> 버튼을 누르세요.</li>
+          <li><strong>홈 화면에 추가</strong>를 선택하세요.</li>
+          <li>오른쪽 위의 <strong>추가</strong>를 누르면 완료됩니다.</li>
+        </ol> : <div className="pwa-browser-guide">
+          <strong>이 브라우저에서는 자동 설치 창을 열 수 없어요.</strong>
+          <span>Chrome 또는 Edge에서 이 사이트를 연 뒤, 옆의 ‘앱 다운로드’ 버튼을 다시 눌러주세요.</span>
+        </div>}
+        <button type="button" onClick={() => setInstallGuide(null)}>확인</button>
       </section>
     </div>}
 
