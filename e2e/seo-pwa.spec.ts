@@ -16,15 +16,16 @@ test("앱 설치 공개 페이지와 검색엔진 파일이 정상 응답한다"
   await expect(page.getByText("Android와 데스크톱")).toBeVisible();
   await expect(page.getByText("iPhone과 iPad")).toBeVisible();
 
-  const [manifest, robots, sitemap, serviceWorker, icon, indexNowKey] = await Promise.all([
+  const [manifest, robots, sitemap, serviceWorker, icon, indexNowKey, googleVerification] = await Promise.all([
     request.get("/app.webmanifest"),
     request.get("/robots.txt"),
     request.get("/sitemap.xml"),
     request.get("/sw.js"),
     request.get("/pwa-512x512.png"),
-    request.get("/7e6d6ee78999ea1bc59a89a61ea26590.txt")
+    request.get("/7e6d6ee78999ea1bc59a89a61ea26590.txt"),
+    request.get("/googlefd1a14b874829389.html")
   ]);
-  for (const response of [manifest, robots, sitemap, serviceWorker, icon, indexNowKey]) expect(response.ok()).toBeTruthy();
+  for (const response of [manifest, robots, sitemap, serviceWorker, icon, indexNowKey, googleVerification]) expect(response.ok()).toBeTruthy();
 
   const manifestBody = await manifest.json();
   expect(manifestBody).toMatchObject({ name: "Diha - 디지털 펫 헬스", short_name: "Diha", display: "standalone", start_url: "/", scope: "/" });
@@ -32,6 +33,7 @@ test("앱 설치 공개 페이지와 검색엔진 파일이 정상 응답한다"
   expect(await sitemap.text()).toContain("https://d-ha.vercel.app/pet-health");
   expect((await icon.body()).byteLength).toBeGreaterThan(10_000);
   expect((await indexNowKey.text()).trim()).toBe("7e6d6ee78999ea1bc59a89a61ea26590");
+  expect((await googleVerification.text()).trim()).toBe("google-site-verification: googlefd1a14b874829389.html");
 });
 
 test("원래 앱 화면에서 작은 다운로드 버튼이 네이티브 설치 창을 연다", async ({ page }) => {

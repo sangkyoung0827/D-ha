@@ -38,4 +38,9 @@ describe("Diha 정적 SEO 자산", () => {
     expect(key).toBe(site.indexNowKey);
     expect(key).toMatch(/^[a-f0-9]{8,128}$/);
   });
+
+  it("Google Search Console 파일 소유권을 공식 루트에서 검증할 수 있다", () => {
+    const verification = projectFile("public/googlefd1a14b874829389.html").trim();
+    expect(verification).toBe("google-site-verification: googlefd1a14b874829389.html");
+  });
 });
