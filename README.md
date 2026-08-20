@@ -106,6 +106,7 @@ Safari에서 공식 주소를 열고 `공유 → 홈 화면에 추가 → 추가
 - 공개 페이지: `/about`, `/dog`, `/cat`, `/pet-health`, `/dha`, `/app`, `/privacy`, `/terms`, `/support`
 - sitemap: [https://d-ha.vercel.app/sitemap.xml](https://d-ha.vercel.app/sitemap.xml)
 - robots: [https://d-ha.vercel.app/robots.txt](https://d-ha.vercel.app/robots.txt)
+- IndexNow: 공개 소유권 키와 `pnpm seo:indexnow` 제출 명령 제공
 - 소유권 인증 환경변수: `VITE_GOOGLE_SITE_VERIFICATION`, `VITE_NAVER_SITE_VERIFICATION`
 
 ### Google Search Console 등록

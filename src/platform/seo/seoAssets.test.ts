@@ -32,4 +32,10 @@ describe("Diha 정적 SEO 자산", () => {
     expect(robots).toContain(`Sitemap: ${site.origin}/sitemap.xml`);
     expect(robots.split("\n")).not.toContain("Disallow: /");
   });
+
+  it("IndexNow 소유권 키를 공식 주소에서 검증할 수 있다", () => {
+    const key = projectFile(`public/${site.indexNowKey}.txt`).trim();
+    expect(key).toBe(site.indexNowKey);
+    expect(key).toMatch(/^[a-f0-9]{8,128}$/);
+  });
 });
