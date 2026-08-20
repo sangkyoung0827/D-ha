@@ -14,7 +14,6 @@ import { loadMiniGameDefinition } from "../minigames/core/loadDefinition";
 import { GameRoom } from "../components/game-ui/GameRoom";
 import { OceanHub } from "../components/game-ui/OceanHub";
 import { isOceanGame, type OceanMode, type OceanZoneId } from "../domain/ocean";
-import { startPwaUpdate } from "../platform/pwa/update";
 import { useAccount } from "../platform/auth/AccountProvider";
 import { GoogleSignInScreen } from "../components/auth/GoogleSignInScreen";
 import { isHomeInterior } from "../domain/home";
@@ -64,7 +63,6 @@ export function App() {
     }
     if (hydratedOwner === null) void hydrate(null);
   }, [accountStatus, account, hydrate, hydratedOwner, syncStatus]);
-  useEffect(() => startPwaUpdate(), []);
   useEffect(() => {
     if (!toast) return;
     const timer = window.setTimeout(clearToast, 2400);

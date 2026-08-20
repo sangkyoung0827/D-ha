@@ -2,6 +2,8 @@ import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import type { PetExploration, PetMedicalProfile } from "../../domain/types";
 import { breedDefinition } from "../../domain/pet";
 import { useGameStore } from "../../store/gameStore";
+import { cameraProvider } from "../../platform/camera/CameraProvider";
+import { locationProvider } from "../../platform/location/LocationProvider";
 
 function FeatureHeader({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) {
   return <header className="pet-feature-header"><p>{eyebrow}</p><h2 id="sheet-title">{title}</h2><span>{copy}</span></header>;
@@ -170,17 +172,16 @@ export function PetExplorationOverlay() {
   const selected = explorations.find((place) => place.id === selectedId) ?? explorations[0];
   const mapUrl = useMemo(() => selected ? openStreetMapEmbed(selected) : "", [selected]);
 
-  const useCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationMessage("이 기기는 위치 기능을 지원하지 않아요.");
-      return;
-    }
+  const requestCurrentLocation = async () => {
     setLocationMessage("현재 위치를 확인하는 중...");
-    navigator.geolocation.getCurrentPosition((position) => {
-      setLatitude(position.coords.latitude.toFixed(6));
-      setLongitude(position.coords.longitude.toFixed(6));
+    try {
+      const position = await locationProvider.current();
+      setLatitude(position.latitude.toFixed(6));
+      setLongitude(position.longitude.toFixed(6));
       setLocationMessage("현재 위치를 입력했어요.");
-    }, () => setLocationMessage("위치 권한이 허용되지 않았어요. 위도와 경도를 직접 입력할 수 있어요."), { enableHighAccuracy: true, timeout: 8_000 });
+    } catch (error) {
+      setLocationMessage(error instanceof Error && error.message === "unsupported" ? "이 기기는 위치 기능을 지원하지 않아요." : "위치 권한이 허용되지 않았어요. 위도와 경도를 직접 입력할 수 있어요.");
+    }
   };
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -212,7 +213,7 @@ export function PetExplorationOverlay() {
       <form className="pet-feature-form" onSubmit={submit}>
         <label className="full"><span>장소 이름</span><input name="placeName" required maxLength={80} placeholder="예: 한강공원 반포지구" /></label>
         <label><span>방문일</span><input name="visitDate" required type="date" defaultValue={today()} /></label>
-        <button className="location-button" type="button" onClick={useCurrentLocation}>⌖ 현재 위치 사용</button>
+        <button className="location-button" type="button" onClick={() => void requestCurrentLocation()}>⌖ 현재 위치 사용</button>
         <label><span>위도</span><input name="latitude" required inputMode="decimal" value={latitude} onChange={(event) => setLatitude(event.target.value)} placeholder="37.5665" /></label>
         <label><span>경도</span><input name="longitude" required inputMode="decimal" value={longitude} onChange={(event) => setLongitude(event.target.value)} placeholder="126.9780" /></label>
         <label className="full"><span>탐험 메모</span><textarea name="note" maxLength={500} placeholder="함께 무엇을 했는지 기록해보세요." /></label>
@@ -250,8 +251,8 @@ function openStreetMapEmbed(place: PetExploration): string {
 async function compressMemoryPhoto(file: File): Promise<string> {
   if (!file.type.startsWith("image/")) throw new Error("JPG, PNG 또는 WebP 사진만 등록할 수 있어요.");
   if (file.size > 12 * 1024 * 1024) throw new Error("12MB 이하의 사진을 선택해주세요.");
-  const source = await readFile(file);
-  const image = await loadImage(source);
+  const source = await cameraProvider.readImage(file);
+  const image = await cameraProvider.loadImage(source);
   const targetWidth = 600;
   const targetHeight = 400;
   const sourceRatio = image.width / image.height;
@@ -274,22 +275,4 @@ async function compressMemoryPhoto(file: File): Promise<string> {
   }
   if (output.length > 350_000) throw new Error("사진을 더 작은 크기로 다시 선택해주세요.");
   return output;
-}
-
-function readFile(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("사진 파일을 읽지 못했어요."));
-    reader.readAsDataURL(file);
-  });
-}
-
-function loadImage(source: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("사진 형식을 확인해주세요."));
-    image.src = source;
-  });
 }

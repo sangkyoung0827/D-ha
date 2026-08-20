@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /__/
+
+Sitemap: https://d-ha.vercel.app/sitemap.xml

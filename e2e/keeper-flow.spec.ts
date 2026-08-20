@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function createPet(page: Page, name = "마루") {
   await page.goto("/?debug=1");
-  await expect(page).toHaveTitle(/D ha · 디하/);
+  await expect(page).toHaveTitle(/Diha 디하/);
   await expect(page.getByRole("img", { name: "선글라스를 쓰고 손을 흔들며 인사하는 알약 디하" })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("안녕!");
   await page.getByRole("button", { name: "디하 시작하기" }).click();

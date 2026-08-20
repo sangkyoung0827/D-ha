@@ -36,7 +36,7 @@ export function Onboarding() {
     return (
       <main className="onboarding ocean-gradient diha-intro" data-testid="onboarding">
         <div className="onboarding-orbit" aria-hidden="true"><span /><span /><span /></div>
-        <div className="diha-wordmark" aria-label="D ha 디하"><strong>D ha</strong><span>디하</span></div>
+        <div className="diha-wordmark" aria-label="Diha 디하"><strong>Diha</strong><span>디하</span></div>
         <div className="pill-mascot" role="img" aria-label="선글라스를 쓰고 손을 흔들며 인사하는 알약 디하">
           <span className="pill-shell"><i className="pill-glasses left" /><i className="pill-glasses right" /><b className="pill-glasses-bridge" /><em className="pill-smile" /></span>
           <span className="pill-arm"><i /><b /></span>

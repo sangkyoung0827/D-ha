@@ -1,26 +1,25 @@
-# D ha · 디하
+# Diha · 디하
 
-사람 형태의 `디하` 캐릭터와 일상을 돌보는 모바일 우선 게임입니다. 네 상태를 살피고 7개 공간을 오가며, Ocean의 연속된 바다 생태계를 탐험해 코인과 경험치를 얻습니다. 의료 서비스나 실제 웰니스 연동처럼 보이지 않도록 게임 시스템과 미래 통합 경계를 분리했습니다.
+Diha(디하)는 반려동물의 산책, 영양, 건강 루틴을 디지털 펫 게임과 연결하는 디지털 펫 헬스 플랫폼입니다. DHA는 플랫폼의 첫 번째 주요 영양 카테고리이며, 게임 속 효과와 실제 참고 정보는 명확히 구분합니다.
 
 ## 현재 구현 범위
 
-- 선글라스를 쓴 알약 디하의 첫 인사, 이름·6개 피부색·8개 머리 스타일·6개 머리 색상·4개 안경 스타일을 고르는 온보딩
-- 생성 미리보기와 실제 캐릭터·미니게임 플레이어가 동일한 외형 값을 사용하며, 기본 복장은 흰 반팔·청바지·흰 운동화
+- 선글라스를 쓴 캡슐 Diha의 첫 인사와 강아지 5종·고양이 5종을 고르는 반려동물 온보딩
+- 이름, 털 색상, 무늬, 목걸이, 모자, 안경·액세서리, 의상을 반영하는 반려동물 커스터마이징
 - 캐릭터 설정 직후 Google 로그인, Firebase Auth 세션 유지, 설정 화면의 계정·동기화 상태와 로그아웃
 - Google UID별 Firestore 클라우드 저장과 UID별 IndexedDB/localStorage 로컬 복사본
 - 포만감·청결·에너지·즐거움·컨디션의 시간 경과 및 최대 24시간 오프라인 계산
-- Home, Kitchen, Ocean, Bathroom, Bedroom, Closet, Workout의 7개 공간과 Ocean 전용 탐험 허브
-- 밥·영양제·운동·에너지 4개 현재 상태만 표시하는 HUD와 자연스러운 인체 비율·호흡·눈깜빡임을 갖춘 디하
+- Home에 통합된 집 공간, Ocean, 반려동물 영양 상점과 Ocean 전용 게임 허브
+- 밥·영양제·운동·에너지 4개 상태 HUD와 선택한 반려동물의 생동감 있는 동작
 - 기기 픽셀 비율을 최대 2배까지 반영하는 HiDPI Phaser 렌더링과 고해상도 텍스트·파티클
-- 해변→바다 수영→서핑보드→해저 동굴→심해로 이어지는 5단계 생태 진행과 7개 Ocean 게임
+- 해변→파도→해저 동굴→심해로 이어지는 Ocean Run과 우주까지 오르는 Jump Up
 - 실제 해변 사진의 구도와 질감을 참고해 새로 생성한 2× 해상도 전용 백사장·청록 바다 배경
-- 상시 패널 대신 서핑보드 `Games`, 점포형 `상점`, 오픈카 `해안도로`만 표시하는 Ocean 하단 퀵 메뉴
-- 필요할 때만 여는 3열 Games 보드와 직전 구간 완주로 열리는 수심 진행
-- 물고기를 직접 잡으면 제품 없이 게임 속 DHA 섭취 효과가 포만·컨디션에 반영되는 바다 수영
+- Ocean Run과 Jump Up의 DHA 게이지, 시야 회복, 계정별 최고 기록
 - 코인, XP, 레벨, 해금, 39개 아이템, 의상 장착, 4개 방 테마
 - 12개 업적, 일일 목표, 연속 방문, 로컬 데모 친구
 - 계정별 IndexedDB 저장, 동기 localStorage 미러, Zod 검증, v1/v2/v3→v4 마이그레이션, JSON 내보내기·가져오기
-- PWA 앱 셸, 오프라인 재실행, 업데이트 배너, 설치 가능한 manifest
+- 설치 버튼, iOS 홈 화면 추가 안내, 업데이트 배너, 오프라인 앱 셸을 갖춘 PWA
+- JavaScript 없이도 읽히는 브랜드 공개 페이지, canonical, JSON-LD, sitemap, robots
 - 사운드·진동·알림·음성 에코 어댑터와 접근성용 Canvas 외부 컨트롤
 
 ## 실행 방법
@@ -49,11 +48,10 @@ E2E 최초 실행 전 Chromium이 없다면 `pnpm exec playwright install chromi
 
 ## 게임 조작
 
-- 화면 아래 통합 line icon 메뉴로 7개 공간을 이동합니다.
-- 주방에서 보유 음식을 선택하고, 욕실 Canvas에서 디하를 드래그하거나 빠른 씻기 버튼을 사용합니다.
-- Home은 행동 바 없이 디하와 바다 전망·실내 식물에 집중합니다. Bedroom은 수면, Closet은 의상 관리를 담당하며 나머지 방은 Context Tray에서 관련 카테고리를 표시합니다.
-- Ocean의 바다 탐험에서 해변 3종, 수영 포획, 상어 회피 서핑, 소나 동굴, 심해 하강을 선택합니다. 레인 게임은 좌우 화살표·스와이프·화면 외부 버튼을 모두 지원합니다.
-- 디하를 터치하면 표정, 대사, 작은 모션으로 반응합니다.
+- 화면 아래 메뉴로 Home, Ocean, 상점을 이동합니다.
+- Home에서는 반려동물을 쓰다듬고 동물병원, 펫 일기, 펫의 탐험, 미용실, 영양 추천을 엽니다.
+- Ocean의 Games에서 Ocean Run과 Jump Up을 선택합니다. 레인 이동은 좌우 키와 스와이프를 지원합니다.
+- 반려동물을 터치하면 표정과 작은 모션으로 반응합니다.
 
 ## 주요 폴더 구조
 
@@ -79,7 +77,7 @@ Firebase 프로젝트는 `d-ha-game`, Firestore 기본 데이터베이스는 서
 
 ## Firebase 관리
 
-보안 규칙을 변경한 뒤에는 다음 명령으로 D ha 전용 프로젝트에만 배포합니다.
+보안 규칙을 변경한 뒤에는 다음 명령으로 Diha 전용 프로젝트에만 배포합니다.
 
 ```bash
 npx firebase-tools deploy --only firestore --project d-ha-game
@@ -89,13 +87,47 @@ Google 제공자는 Firebase Authentication에서 활성화되어 있으며 공�
 
 ## PWA 설치
 
-Production 또는 로컬 HTTPS 환경에서 브라우저의 “앱 설치” 메뉴를 사용합니다. 앱 셸과 정적 리소스가 미리 캐시되며, 새 서비스 워커는 기존 공식 주소에서 자동 활성화되고 오래된 캐시는 정리됩니다. 알림·마이크 권한은 해당 기능의 명시적 버튼을 누를 때만 요청합니다.
+공식 주소 또는 로컬 HTTPS 환경에서 설치할 수 있습니다. 앱 셸과 핵심 정적 리소스를 미리 캐시하며, 새 버전이 있으면 사용자가 `업데이트`를 눌렀을 때 최신 서비스 워커로 전환합니다.
+
+### Android / Desktop Chromium
+
+Chrome 또는 Edge에서 공식 주소를 연 뒤 앱에 나타나는 `Diha 설치하기` 버튼을 누릅니다. 설치 이벤트를 지원하지 않으면 브라우저 메뉴의 `앱 설치`를 이용합니다.
+
+### iPhone / iPad
+
+Safari에서 공식 주소를 열고 `공유 → 홈 화면에 추가 → 추가`를 선택합니다. 앱의 설치 안내 버튼에서도 같은 절차를 확인할 수 있습니다.
+
+설치된 아이콘을 누르면 주소 표시줄 없는 standalone 모드로 현재 계정과 펫 상태를 불러옵니다. 온보딩이나 로그인이 끝나지 않았다면 해당 단계부터 이어집니다.
+
+## SEO 구조
+
+- 브랜드 title: `Diha 디하 | 디지털 펫 헬스 플랫폼`
+- 공식 canonical: `https://d-ha.vercel.app/`
+- 공개 페이지: `/about`, `/dog`, `/cat`, `/pet-health`, `/dha`, `/app`, `/privacy`, `/terms`, `/support`
+- sitemap: [https://d-ha.vercel.app/sitemap.xml](https://d-ha.vercel.app/sitemap.xml)
+- robots: [https://d-ha.vercel.app/robots.txt](https://d-ha.vercel.app/robots.txt)
+- 소유권 인증 환경변수: `VITE_GOOGLE_SITE_VERIFICATION`, `VITE_NAVER_SITE_VERIFICATION`
+
+### Google Search Console 등록
+
+1. 공식 Production URL을 Search Console에 등록합니다.
+2. 발급된 verification token을 Vercel 환경변수에 넣고 재배포합니다.
+3. `sitemap.xml`을 제출합니다.
+4. 홈페이지 URL 검사를 실행하고 색인 생성을 요청합니다.
+
+### Naver Search Advisor 등록
+
+1. 공식 Production URL을 사이트로 등록합니다.
+2. 발급된 token을 Vercel 환경변수에 넣고 재배포합니다.
+3. `sitemap.xml`을 제출하고 수집 상태를 확인합니다.
+
+계정 로그인이 필요한 단계는 자동화하지 않습니다. 전체 수동 점검은 [MANUAL_RELEASE_CHECKLIST.md](./MANUAL_RELEASE_CHECKLIST.md)를 따릅니다.
 
 ## 데모 모드
 
 `/?debug=1`에서 오른쪽 `DEV` 탭을 엽니다. 상태 조절, 1시간·1일·3일 경과, 오프라인 복귀, 코인·레벨, 전체 아이템, 업적 초기화, 인앱 알림, 애니메이션, 저장 시각을 실제 도메인 경로로 시험할 수 있습니다.
 
-## Production
+## Production URL
 
 [https://d-ha.vercel.app](https://d-ha.vercel.app)
 
@@ -107,6 +139,6 @@ Production 또는 로컬 HTTPS 환경에서 브라우저의 “앱 설치” 메
 - 해안도로는 Ocean에서 바다 탐험과 분리된 두 번째 트랙으로 자리만 마련했으며, 차량·조작·코스는 다음 설계 입력 이후 구현합니다.
 - 웰니스·제품 활성화는 명시적인 Mock Provider이며 실제 제품·의료 효능을 뜻하지 않습니다.
 
-## 향후 디하 확장
+## Future Capacitor Migration
 
-QR 제품 활성화, serving 수량, 섭취 루틴, 디하·웰니스 데이터, 모바일 로컬 알림과 실제 친구는 `src/platform` 인터페이스 뒤에서 교체합니다. 세부 경계는 [INTEGRATION_BOUNDARIES.md](./INTEGRATION_BOUNDARIES.md), 모바일 전환은 [MOBILE_MIGRATION.md](./MOBILE_MIGRATION.md)를 참고합니다.
+위치, 사진 입력, 알림, 햅틱과 PWA 설치 수명주기는 `src/platform`의 웹 어댑터 뒤에 둡니다. 향후 Capacitor 프로젝트에서는 React와 게임 코드를 유지하고 `WebLocationProvider`, `WebCameraProvider`, `WebNotificationProvider` 등을 네이티브 구현으로 교체합니다. 세부 경계는 [INTEGRATION_BOUNDARIES.md](./INTEGRATION_BOUNDARIES.md), 모바일 전환은 [MOBILE_MIGRATION.md](./MOBILE_MIGRATION.md)를 참고합니다.

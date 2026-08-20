@@ -392,7 +392,7 @@ async function searchCrossref(query: string): Promise<ResearchSource[]> {
   url.searchParams.set("query", query);
   url.searchParams.set("rows", "6");
   if (process.env.CROSSREF_MAILTO) url.searchParams.set("mailto", process.env.CROSSREF_MAILTO);
-  const response = await fetchWithTimeout(url, { headers: { Accept: "application/json", "User-Agent": "D-ha-Pet-Researcher/0.1" } }, 12_000);
+  const response = await fetchWithTimeout(url, { headers: { Accept: "application/json", "User-Agent": "Diha-Pet-Researcher/0.1" } }, 12_000);
   if (!response.ok) throw new ApiError(502, "CROSSREF_FAILED", "Crossref 검색에 실패했습니다.");
   const body = await response.json() as { message?: { items?: Array<Record<string, any>> } };
   return (body.message?.items ?? []).flatMap((paper): ResearchSource[] => {
@@ -425,7 +425,7 @@ async function generateGroundedAnswer(payload: PetResearchRequest, sources: Rese
     {
       role: "system",
       content: [
-        "당신은 D-ha 앱의 '헤더 펫 연구원'입니다. 반려동물에 관한 질문만 답합니다.",
+        "당신은 Diha 앱의 '헤더 펫 연구원'입니다. 반려동물에 관한 질문만 답합니다.",
         "제공된 연구자료를 우선 사용하고 사실 주장 뒤에는 반드시 [1]처럼 근거 번호를 붙입니다.",
         "질문의 동물 종과 직접 관련된 자료만 근거로 사용합니다. 사람이나 설치류 연구는 직접 근거로 표현하지 말고, 제공되더라도 간접 근거임을 명시합니다.",
         "초록이 없거나 근거가 부족하면 결론을 추측하지 말고 한계를 명확히 밝힙니다.",
@@ -484,7 +484,7 @@ async function generateSupplementExplanation(
     {
       role: "system",
       content: [
-        "당신은 D-ha의 반려동물 영양 스크리닝 설명 AI입니다. 계산은 서버의 규칙 엔진이 완료했으며 수치를 수정하거나 새 용량을 만들어서는 안 됩니다.",
+        "당신은 Diha의 반려동물 영양 스크리닝 설명 AI입니다. 계산은 서버의 규칙 엔진이 완료했으며 수치를 수정하거나 새 용량을 만들어서는 안 됩니다.",
         "[1] FEDIAF 2025: 성장·번식용 완전사료에서 EPA+DHA는 개 130mg/1000kcal, 고양이 30mg/1000kcal의 최소 권장 수준이다. 이는 완전사료 조성 기준이지 치료 용량이 아니다.",
         "[1]은 건강한 성견·성묘에 특정 오메가3 수준을 권고하기에는 현재 정보가 부족하다고 밝힌다.",
         "[2] WSAVA는 반려동물·식이·급여환경을 함께 평가하고 수의진료팀의 개별 영양 평가를 권한다.",

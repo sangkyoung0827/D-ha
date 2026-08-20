@@ -28,6 +28,15 @@
       "source": "/api/:path*",
       "destination": "/api/:path*"
     },
+    { "source": "/about", "destination": "/about.html" },
+    { "source": "/dog", "destination": "/dog.html" },
+    { "source": "/cat", "destination": "/cat.html" },
+    { "source": "/pet-health", "destination": "/pet-health.html" },
+    { "source": "/dha", "destination": "/dha.html" },
+    { "source": "/app", "destination": "/app.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/support", "destination": "/support.html" },
     {
       "source": "/(.*)",
       "destination": "/index.html"

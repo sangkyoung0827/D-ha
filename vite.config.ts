@@ -1,5 +1,5 @@
 import react from "@vitejs/plugin-react";
-import type { Plugin } from "vite";
+import { loadEnv, type HtmlTagDescriptor, type Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 import { petResearchHandler } from "./server/petResearch";
@@ -21,33 +21,69 @@ function petResearchDevApi(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [
-    react(),
-    petResearchDevApi(),
-    VitePWA({
-      registerType: "autoUpdate",
-      includeAssets: ["icon.svg"],
+const PUBLIC_ROUTES = ["/about", "/dog", "/cat", "/pet-health", "/dha", "/app", "/privacy", "/terms", "/support"];
+
+function seoStaticRoutes(): Plugin {
+  const rewrite = (request: import("node:http").IncomingMessage, _response: import("node:http").ServerResponse, next: () => void) => {
+    if (request.url) {
+      const url = new URL(request.url, "http://diha.local");
+      if (PUBLIC_ROUTES.includes(url.pathname)) request.url = `${url.pathname}.html${url.search}`;
+    }
+    next();
+  };
+  return {
+    name: "diha-static-seo-routes",
+    configureServer(server) { server.middlewares.use(rewrite); },
+    configurePreviewServer(server) { server.middlewares.use(rewrite); }
+  };
+}
+
+function searchVerificationMeta(env: Record<string, string>): Plugin {
+  return {
+    name: "diha-search-verification",
+    transformIndexHtml() {
+      const tags: HtmlTagDescriptor[] = [];
+      if (env.VITE_GOOGLE_SITE_VERIFICATION) tags.push({ tag: "meta", attrs: { name: "google-site-verification", content: env.VITE_GOOGLE_SITE_VERIFICATION }, injectTo: "head" });
+      if (env.VITE_NAVER_SITE_VERIFICATION) tags.push({ tag: "meta", attrs: { name: "naver-site-verification", content: env.VITE_NAVER_SITE_VERIFICATION }, injectTo: "head" });
+      return tags;
+    }
+  };
+}
+
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "");
+  return {
+    plugins: [
+      react(),
+      seoStaticRoutes(),
+      searchVerificationMeta(env),
+      petResearchDevApi(),
+      VitePWA({
+      registerType: "prompt",
+      manifestFilename: "app.webmanifest",
+      includeAssets: ["icon.svg", "pwa-192x192.png", "pwa-512x512.png", "pwa-maskable-512x512.png", "apple-touch-icon.png"],
       manifest: {
-        name: "D ha · 디하",
-        short_name: "디하",
-        description: "디하 캐릭터와 바다 생태계를 탐험하는 로컬 우선 게임",
+        id: "/",
+        name: "Diha - 디지털 펫 헬스",
+        short_name: "Diha",
+        description: "강아지와 고양이의 산책, 영양, 건강 루틴을 디지털 펫 게임과 연결하는 디지털 펫 헬스 플랫폼",
         theme_color: "#0b7085",
-        background_color: "#f5ead2",
+        background_color: "#fff9e9",
         display: "standalone",
         orientation: "portrait",
         start_url: "/",
+        scope: "/",
         lang: "ko",
+        categories: ["health", "lifestyle", "games"],
         icons: [
-          { src: "/icon.svg", sizes: "192x192", type: "image/svg+xml", purpose: "any" },
-          { src: "/icon.svg", sizes: "512x512", type: "image/svg+xml", purpose: "maskable" }
+          { src: "/pwa-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/pwa-512x512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/pwa-maskable-512x512.png", sizes: "512x512", type: "image/png", purpose: "maskable" }
         ]
       },
       workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
         cleanupOutdatedCaches: true,
-        globPatterns: ["**/*.{js,css,html,svg,jpg,jpeg,webmanifest}"],
+        globPatterns: ["**/*.{js,css,html,svg,png,jpg,jpeg,webmanifest,xml,txt}"],
         globIgnores: ["assets/*-photoreal-v1.jpg"],
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//, /^\/__\/auth\//, /^\/__\/firebase\//],
@@ -62,23 +98,24 @@ export default defineConfig({
           }
         ]
       }
-    })
-  ],
-  build: {
-    target: "es2022",
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          phaser: ["phaser"],
-          persistence: ["idb", "zod"]
+      })
+    ],
+    build: {
+      target: "es2022",
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            phaser: ["phaser"],
+            persistence: ["idb", "zod"]
+          }
         }
       }
+    },
+    test: {
+      environment: "jsdom",
+      setupFiles: ["./src/test/setup.ts"],
+      include: ["src/**/*.test.{ts,tsx}"],
+      coverage: { reporter: ["text", "html"] }
     }
-  },
-  test: {
-    environment: "jsdom",
-    setupFiles: ["./src/test/setup.ts"],
-    include: ["src/**/*.test.{ts,tsx}"],
-    coverage: { reporter: ["text", "html"] }
-  }
+  };
 });

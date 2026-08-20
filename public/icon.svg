@@ -1,12 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="D ha 디하 앱 아이콘">
-  <defs><linearGradient id="sea" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#45c8c4"/><stop offset="1" stop-color="#075b83"/></linearGradient></defs>
-  <rect width="512" height="512" rx="112" fill="#f6e7c8"/>
-  <circle cx="256" cy="256" r="190" fill="url(#sea)"/>
-  <path d="M83 316c66-60 122 31 179-22 59-54 105 42 168-16v124H83z" fill="#8ddbd2" opacity=".9"/>
-  <circle cx="256" cy="197" r="68" fill="#f0b98f"/>
-  <path d="M187 190c10-73 126-98 139 8-25-27-49-39-81-35-21 3-36 13-58 27z" fill="#173f51"/>
-  <path d="M164 382c8-93 44-127 92-127s85 34 93 127" fill="#ffce6a"/>
-  <circle cx="232" cy="202" r="7" fill="#173f51"/><circle cx="280" cy="202" r="7" fill="#173f51"/>
-  <path d="M233 230c13 13 33 13 46 0" fill="none" stroke="#9f4c42" stroke-width="8" stroke-linecap="round"/>
-  <path d="M125 110c42-30 79-42 111-50" stroke="#fff" stroke-width="16" stroke-linecap="round" opacity=".45"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="선글라스를 쓴 캡슐 모양 Diha 앱 아이콘">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#5dd4c6"/><stop offset="1" stop-color="#087286"/></linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffdf78"/><stop offset="1" stop-color="#f3ad43"/></linearGradient>
+    <linearGradient id="bottom" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#74ded0"/><stop offset="1" stop-color="#24a8ad"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#073f4e" flood-opacity=".28"/></filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="#fff5db"/>
+  <circle cx="256" cy="256" r="205" fill="url(#bg)"/>
+  <circle cx="160" cy="112" r="54" fill="#fff" opacity=".15"/>
+  <ellipse cx="256" cy="411" rx="102" ry="24" fill="#073f4e" opacity=".2"/>
+  <g filter="url(#shadow)" transform="rotate(-5 256 254)">
+    <path d="M172 251V166c0-52 38-92 84-92s84 40 84 92v85z" fill="url(#top)"/>
+    <path d="M172 251h168v91c0 52-38 94-84 94s-84-42-84-94z" fill="url(#bottom)"/>
+    <path d="M172 247h168v13H172z" fill="#fff8e8"/>
+    <path d="M197 113c14-17 31-26 49-30" fill="none" stroke="#fff" stroke-width="16" stroke-linecap="round" opacity=".4"/>
+    <g fill="#0c2f3c" stroke="#08232d" stroke-width="8">
+      <path d="M187 185c20-16 53-17 72 1l-8 50c-18 18-48 17-61-5z"/>
+      <path d="M325 185c-20-16-53-17-72 1l8 50c18 18 48 17 61-5z"/>
+    </g>
+    <path d="M247 192h18" stroke="#08232d" stroke-width="10" stroke-linecap="round"/>
+    <path d="M199 178l-24-10M313 178l24-10" stroke="#08232d" stroke-width="9" stroke-linecap="round"/>
+    <path d="M224 282c19 17 45 17 64 0" fill="none" stroke="#16535a" stroke-width="9" stroke-linecap="round"/>
+  </g>
+  <path d="M343 292c54 4 80-23 92-66" fill="none" stroke="#f4b24b" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="438" cy="218" r="15" fill="#ffd46b"/>
+  <path d="M430 206l-1-22M440 206l10-18M421 210l-18-13" stroke="#ffd46b" stroke-width="9" stroke-linecap="round"/>
 </svg>

@@ -2,39 +2,30 @@ import { registerSW } from "virtual:pwa-register";
 
 const UPDATE_INTERVAL_MS = 60 * 60 * 1000;
 
-/**
- * Keep an installed D ha PWA on the current release without asking the player
- * to manually clear caches or reload after a deployment.
- */
-export function startPwaUpdate(): () => void {
+export interface PwaUpdateCallbacks {
+  onNeedRefresh(update: () => Promise<void>): void;
+  onOfflineReady?(): void;
+}
+
+/** Owns service-worker state so React only renders the update experience. */
+export function startPwaUpdate(callbacks: PwaUpdateCallbacks): () => void {
   if (!("serviceWorker" in navigator)) return () => undefined;
 
-  const hadController = Boolean(navigator.serviceWorker.controller);
-  let reloading = false;
   let registration: ServiceWorkerRegistration | undefined;
-  const updateHandle: { apply?: (reloadPage?: boolean) => Promise<void> } = {};
-
-  const handleControllerChange = () => {
-    if (!hadController || reloading) return;
-    reloading = true;
-    window.location.reload();
-  };
+  let updateServiceWorker: (reloadPage?: boolean) => Promise<void> = async () => undefined;
 
   const checkForUpdate = () => {
     if (document.visibilityState === "visible") void registration?.update();
   };
 
-  navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
-
-  updateHandle.apply = registerSW({
+  updateServiceWorker = registerSW({
     immediate: true,
     onRegisteredSW: (_serviceWorkerUrl, registered) => {
       registration = registered;
       void registration?.update();
     },
-    onNeedRefresh: () => {
-      void updateHandle.apply?.(true);
-    }
+    onNeedRefresh: () => callbacks.onNeedRefresh(() => updateServiceWorker(true)),
+    onOfflineReady: callbacks.onOfflineReady
   });
 
   document.addEventListener("visibilitychange", checkForUpdate);
@@ -43,6 +34,5 @@ export function startPwaUpdate(): () => void {
   return () => {
     window.clearInterval(updateInterval);
     document.removeEventListener("visibilitychange", checkForUpdate);
-    navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
   };
 }
