@@ -6,8 +6,8 @@ const DB_NAME = "diha-keeper";
 const STORE_NAME = "game-save";
 const DB_VERSION = 2;
 const GUEST_SAVE_KEY = "primary";
-const LOCAL_MIRROR_PREFIX = "diha-save-v6";
-const PREVIOUS_LOCAL_MIRROR_PREFIX = "diha-save-v5";
+const LOCAL_MIRROR_PREFIX = "diha-save-v7";
+const PREVIOUS_LOCAL_MIRROR_PREFIXES = ["diha-save-v6", "diha-save-v5"] as const;
 const LEGACY_LOCAL_MIRROR_KEYS = ["diha-keeper-primary-v3"] as const;
 const LEGACY_LOCAL_MIRROR_KEY = "diha-primary-v4";
 const memoryFallback = new Map<string, GameSave>();
@@ -28,8 +28,8 @@ function canUseIndexedDb(): boolean {
 function loadLocalMirror(userId: string | null): RecoveryResult | null {
   try {
     const keys = userId
-      ? [mirrorKeyForOwner(userId), `${PREVIOUS_LOCAL_MIRROR_PREFIX}:user:${userId}`]
-      : [mirrorKeyForOwner(null), `${PREVIOUS_LOCAL_MIRROR_PREFIX}:guest`, LEGACY_LOCAL_MIRROR_KEY, ...LEGACY_LOCAL_MIRROR_KEYS];
+      ? [mirrorKeyForOwner(userId), ...PREVIOUS_LOCAL_MIRROR_PREFIXES.map((prefix) => `${prefix}:user:${userId}`)]
+      : [mirrorKeyForOwner(null), ...PREVIOUS_LOCAL_MIRROR_PREFIXES.map((prefix) => `${prefix}:guest`), LEGACY_LOCAL_MIRROR_KEY, ...LEGACY_LOCAL_MIRROR_KEYS];
     return keys.reduce<RecoveryResult | null>((newest, key) => {
       const raw = globalThis.localStorage?.getItem(key);
       return newestResult(newest, raw ? parseImportedSave(raw) : null);
@@ -42,7 +42,7 @@ function loadLocalMirror(userId: string | null): RecoveryResult | null {
 function saveLocalMirror(save: GameSave, userId: string | null): void {
   try {
     globalThis.localStorage?.setItem(mirrorKeyForOwner(userId), JSON.stringify(save));
-    globalThis.localStorage?.removeItem(`${PREVIOUS_LOCAL_MIRROR_PREFIX}:${userId ? `user:${userId}` : "guest"}`);
+    for (const prefix of PREVIOUS_LOCAL_MIRROR_PREFIXES) globalThis.localStorage?.removeItem(`${prefix}:${userId ? `user:${userId}` : "guest"}`);
     if (!userId) {
       globalThis.localStorage?.removeItem(LEGACY_LOCAL_MIRROR_KEY);
       for (const key of LEGACY_LOCAL_MIRROR_KEYS) globalThis.localStorage?.removeItem(key);
@@ -93,7 +93,7 @@ export async function clearGame(userId: string | null = null): Promise<void> {
   memoryFallback.delete(storageKey);
   try {
     globalThis.localStorage?.removeItem(mirrorKeyForOwner(userId));
-    globalThis.localStorage?.removeItem(`${PREVIOUS_LOCAL_MIRROR_PREFIX}:${userId ? `user:${userId}` : "guest"}`);
+    for (const prefix of PREVIOUS_LOCAL_MIRROR_PREFIXES) globalThis.localStorage?.removeItem(`${prefix}:${userId ? `user:${userId}` : "guest"}`);
     if (!userId) {
       globalThis.localStorage?.removeItem(LEGACY_LOCAL_MIRROR_KEY);
       for (const key of LEGACY_LOCAL_MIRROR_KEYS) globalThis.localStorage?.removeItem(key);

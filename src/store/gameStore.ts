@@ -94,7 +94,7 @@ function addNotification(save: GameSave, notification: Omit<GameNotification, "i
 
 function saveFromStore(state: GameStore): GameSave {
   return {
-    version: 6,
+    version: 7,
     profile: state.profile,
     tutorialComplete: state.tutorialComplete,
     needs: state.needs,

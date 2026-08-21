@@ -338,6 +338,36 @@ test("동물병원·펫 일기·펫의 탐험 기록은 계정별 저장에 연�
   await page.getByRole("button", { name: "지도에 장소 저장" }).click();
   await expect(page.getByText("반포한강공원").first()).toBeVisible();
   await expect(page.getByTitle("반포한강공원 지도")).toBeVisible();
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: {
+        getCurrentPosition: () => undefined,
+        watchPosition: (success: PositionCallback) => {
+          const startedAt = Date.now();
+          const positions = [
+            { latitude: 37.5105, longitude: 126.995, timestamp: startedAt },
+            { latitude: 37.5108, longitude: 126.9951, timestamp: startedAt + 15_000 },
+            { latitude: 37.5111, longitude: 126.9952, timestamp: startedAt + 30_000 }
+          ];
+          positions.forEach((position, index) => window.setTimeout(() => success({
+            coords: { latitude: position.latitude, longitude: position.longitude, accuracy: 8 },
+            timestamp: position.timestamp
+          } as GeolocationPosition), index * 40));
+          return 82;
+        },
+        clearWatch: () => undefined
+      }
+    });
+  });
+  await page.getByLabel("실시간 탐험 이름").fill("저녁 강변 탐험");
+  await page.getByLabel("경로 기록 메모").fill("함께 걸은 경로");
+  await page.getByRole("button", { name: "탐험 시작" }).click();
+  await expect(page.getByTestId("live-exploration-point-count")).toHaveText("3");
+  await expect(page.getByTitle("실시간 탐험 지도")).toBeVisible();
+  await page.getByRole("button", { name: "탐험 종료 및 저장" }).click();
+  await expect(page.getByText("저녁 강변 탐험").first()).toBeVisible();
+  await expect(page.getByText(/m · \d+초/).first()).toBeVisible();
   await page.getByLabel("닫기").click();
 
   await page.reload();
@@ -348,6 +378,8 @@ test("동물병원·펫 일기·펫의 탐험 기록은 계정별 저장에 연�
   await expect(page.getByText("처음 함께 간 바다")).toBeVisible();
   await page.getByLabel("닫기").click();
   await places.getByRole("button", { name: /펫의 탐험/ }).click();
+  await expect(page.getByText("저녁 강변 탐험").first()).toBeVisible();
+  await expect(page.getByLabel("저장된 탐험 경로 누적 표시")).toBeVisible();
   await expect(page.getByText("반포한강공원").first()).toBeVisible();
 });
 

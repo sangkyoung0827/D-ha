@@ -33,6 +33,13 @@ import { newestAccountSave } from "../store/accountSave";
 import { persistenceKeyForOwner } from "../store/persistence";
 import { isHomeInterior, topLevelRoom } from "../domain/home";
 import { calculateSupplementAssessment } from "../domain/supplementRecommendation";
+import {
+  appendExplorationTrackPoint,
+  distanceBetweenTrackPoints,
+  MAX_EXPLORATION_TRACK_POINTS,
+  totalExplorationDistanceMeters
+} from "../domain/exploration";
+import type { ExplorationTrackPoint } from "../domain/types";
 
 const start = new Date("2026-08-01T00:00:00.000Z");
 
@@ -179,7 +186,7 @@ describe("진행 데이터", () => {
     expect(refreshed.goals.every((goal) => goal.progress === 0 && !goal.completed)).toBe(true);
   });
 
-  it("기존 사람 외형 저장을 진행 상태를 보존한 반려동물 v6 저장으로 마이그레이션한다", () => {
+  it("기존 사람 외형 저장을 진행 상태를 보존한 반려동물 v7 저장으로 마이그레이션한다", () => {
     const current = createDefaultSave(start);
     const legacyProfile = {
       name: current.profile.name,
@@ -192,7 +199,7 @@ describe("진행 데이터", () => {
     const result = migrateSave(legacy, start);
 
     expect(result.status).toBe("migrated");
-    expect(result.save.version).toBe(6);
+    expect(result.save.version).toBe(7);
     expect(result.save.profile.name).toBe(current.profile.name);
     expect(result.save.profile.breed).toBe("maltese");
     expect(result.save.coins).toBe(777);
@@ -221,6 +228,28 @@ describe("진행 데이터", () => {
     expect(result.save.petExplorations).toEqual([]);
   });
 
+  it("v6의 단일 탐험 장소를 빈 경로가 있는 v7 기록으로 안전하게 옮긴다", () => {
+    const current = createDefaultSave(start);
+    const previous = {
+      ...current,
+      version: 6,
+      petExplorations: [{
+        id: "place-old",
+        placeName: "한강공원",
+        visitDate: "2026-08-01",
+        note: "산책",
+        latitude: 37.51,
+        longitude: 126.99,
+        createdAt: start.toISOString()
+      }]
+    };
+    const result = migrateSave(previous, start);
+
+    expect(result.status).toBe("migrated");
+    expect(result.save.version).toBe(7);
+    expect(result.save.petExplorations[0]).toMatchObject({ route: [], distanceMeters: 0, durationSeconds: 0 });
+  });
+
   it("손상 저장 데이터는 백업과 안전한 새 저장을 제공한다", () => {
     const malformed = parseImportedSave("{not-json");
     const invalid = migrateSave({ version: 5, coins: -10 }, start);
@@ -228,8 +257,46 @@ describe("진행 데이터", () => {
     expect(malformed.status).toBe("corrupt");
     expect(malformed.backup).toBe("{not-json");
     expect(invalid.status).toBe("corrupt");
-    expect(invalid.save.version).toBe(6);
+    expect(invalid.save.version).toBe(7);
     expect(invalid.save.coins).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("펫 탐험 경로", () => {
+  const point = (latitude: number, longitude: number, seconds: number, accuracy = 8): ExplorationTrackPoint => ({
+    latitude,
+    longitude,
+    accuracy,
+    capturedAt: new Date(start.getTime() + seconds * 1_000).toISOString()
+  });
+
+  it("GPS 좌표 간 실제 이동 거리와 누적 거리를 계산한다", () => {
+    const route = [point(37.5, 127, 0), point(37.501, 127, 60), point(37.502, 127, 120)];
+
+    expect(distanceBetweenTrackPoints(route[0]!, route[1]!)).toBeGreaterThan(110);
+    expect(distanceBetweenTrackPoints(route[0]!, route[1]!)).toBeLessThan(112);
+    expect(totalExplorationDistanceMeters(route)).toBeGreaterThan(220);
+  });
+
+  it("정확도가 낮거나 비정상적으로 빠른 GPS 점프는 경로에서 제외한다", () => {
+    const first = point(37.5, 127, 0);
+    const poorAccuracy = point(37.501, 127, 60, 200);
+    const impossibleJump = point(37.6, 127, 61);
+    const route = appendExplorationTrackPoint([], first);
+
+    expect(appendExplorationTrackPoint(route, poorAccuracy)).toBe(route);
+    expect(appendExplorationTrackPoint(route, impossibleJump)).toBe(route);
+  });
+
+  it("긴 탐험은 오래된 점을 축약해 저장 크기 상한을 지킨다", () => {
+    let route: ExplorationTrackPoint[] = [];
+    for (let index = 0; index < MAX_EXPLORATION_TRACK_POINTS + 20; index += 1) {
+      route = appendExplorationTrackPoint(route, point(37.5 + index * 0.00003, 127, index * 5));
+    }
+
+    expect(route.length).toBeLessThanOrEqual(MAX_EXPLORATION_TRACK_POINTS);
+    expect(route[0]?.latitude).toBe(37.5);
+    expect(route.at(-1)?.latitude).toBeCloseTo(37.5 + (MAX_EXPLORATION_TRACK_POINTS + 19) * 0.00003);
   });
 });
 

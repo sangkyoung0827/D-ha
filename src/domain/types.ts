@@ -124,6 +124,13 @@ export interface PetMemory {
   createdAt: string;
 }
 
+export interface ExplorationTrackPoint {
+  latitude: number;
+  longitude: number;
+  accuracy: number;
+  capturedAt: string;
+}
+
 export interface PetExploration {
   id: string;
   placeName: string;
@@ -131,6 +138,9 @@ export interface PetExploration {
   note: string;
   latitude: number;
   longitude: number;
+  route: ExplorationTrackPoint[];
+  distanceMeters: number;
+  durationSeconds: number;
   createdAt: string;
 }
 
@@ -162,7 +172,7 @@ export interface MiniGameResult {
 }
 
 export interface GameSave {
-  version: 6;
+  version: 7;
   profile: PetProfile;
   tutorialComplete: boolean;
   needs: NeedValues;

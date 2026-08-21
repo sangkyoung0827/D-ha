@@ -18,7 +18,7 @@ export const DEFAULT_PROFILE: PetProfile = {
 export function createDefaultSave(now = new Date(), profile = DEFAULT_PROFILE): GameSave {
   const date = localDateKey(now);
   return {
-    version: 6,
+    version: 7,
     profile,
     tutorialComplete: false,
     needs: { satiety: 78, hygiene: 76, energy: 72, joy: 80, condition: 77 },

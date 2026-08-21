@@ -1,5 +1,6 @@
-import { useMemo, useState, type ChangeEvent, type FormEvent } from "react";
-import type { PetExploration, PetMedicalProfile } from "../../domain/types";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { appendExplorationTrackPoint, distanceBetweenTrackPoints } from "../../domain/exploration";
+import type { ExplorationTrackPoint, PetExploration, PetMedicalProfile } from "../../domain/types";
 import { breedDefinition } from "../../domain/pet";
 import { useGameStore } from "../../store/gameStore";
 import { cameraProvider } from "../../platform/camera/CameraProvider";
@@ -169,8 +170,34 @@ export function PetExplorationOverlay() {
   const [longitude, setLongitude] = useState("");
   const [locationMessage, setLocationMessage] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(explorations[0]?.id ?? null);
+  const [tracking, setTracking] = useState(false);
+  const [liveRoute, setLiveRoute] = useState<ExplorationTrackPoint[]>([]);
+  const [trackingName, setTrackingName] = useState(`${profile.name}와의 탐험`);
+  const [trackingNote, setTrackingNote] = useState("");
+  const [trackingMessage, setTrackingMessage] = useState("탐험을 시작하면 이동 경로가 실시간으로 지도에 표시돼요.");
+  const [trackingSeconds, setTrackingSeconds] = useState(0);
+  const [liveDistance, setLiveDistance] = useState(0);
+  const liveRouteRef = useRef<ExplorationTrackPoint[]>([]);
+  const liveDistanceRef = useRef(0);
+  const trackingStartedAtRef = useRef<number | null>(null);
+  const stopLocationWatchRef = useRef<(() => void) | null>(null);
   const selected = explorations.find((place) => place.id === selectedId) ?? explorations[0];
-  const mapUrl = useMemo(() => selected ? openStreetMapEmbed(selected) : "", [selected]);
+  const mapBounds = useMemo(() => explorationMapBounds(explorations, liveRoute[0]), [explorations, liveRoute]);
+  const mapUrl = useMemo(() => mapBounds ? openStreetMapEmbed(mapBounds, liveRoute[0] ?? selected) : "", [mapBounds, liveRoute, selected]);
+  const activeLocation = liveRoute.at(-1) ?? selected;
+
+  useEffect(() => () => {
+    stopLocationWatchRef.current?.();
+    stopLocationWatchRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (!tracking || trackingStartedAtRef.current === null) return;
+    const updateDuration = () => setTrackingSeconds(Math.max(0, Math.floor((Date.now() - trackingStartedAtRef.current!) / 1_000)));
+    updateDuration();
+    const timer = window.setInterval(updateDuration, 1_000);
+    return () => window.clearInterval(timer);
+  }, [tracking]);
 
   const requestCurrentLocation = async () => {
     setLocationMessage("현재 위치를 확인하는 중...");
@@ -194,7 +221,7 @@ export function PetExplorationOverlay() {
       setLocationMessage("올바른 위도와 경도를 입력해주세요.");
       return;
     }
-    addExploration({ placeName: String(data.get("placeName") ?? "").trim(), visitDate: String(data.get("visitDate") ?? ""), note: String(data.get("note") ?? "").trim(), latitude: lat, longitude: lng });
+    addExploration({ placeName: String(data.get("placeName") ?? "").trim(), visitDate: String(data.get("visitDate") ?? ""), note: String(data.get("note") ?? "").trim(), latitude: lat, longitude: lng, route: [], distanceMeters: 0, durationSeconds: 0 });
     form.reset();
     setLatitude("");
     setLongitude("");
@@ -202,11 +229,100 @@ export function PetExplorationOverlay() {
     setSelectedId(null);
   };
 
+  const startExploration = () => {
+    if (tracking) return;
+    stopLocationWatchRef.current?.();
+    stopLocationWatchRef.current = null;
+    liveRouteRef.current = [];
+    liveDistanceRef.current = 0;
+    setLiveDistance(0);
+    trackingStartedAtRef.current = Date.now();
+    setLiveRoute([]);
+    setTrackingSeconds(0);
+    setTracking(true);
+    setTrackingMessage("위치 권한을 확인하고 있어요. 잠시만 기다려주세요.");
+    try {
+      const stopWatch = locationProvider.watch((point) => {
+        const previousRoute = liveRouteRef.current;
+        const nextRoute = appendExplorationTrackPoint(previousRoute, point);
+        if (nextRoute === previousRoute) return;
+        const previousPoint = previousRoute.at(-1);
+        if (previousPoint) liveDistanceRef.current += distanceBetweenTrackPoints(previousPoint, point);
+        setLiveDistance(liveDistanceRef.current);
+        liveRouteRef.current = nextRoute;
+        setLiveRoute(nextRoute);
+        setTrackingMessage(`GPS 연결됨 · 현재 정확도 약 ${Math.round(point.accuracy)}m`);
+      }, (error) => {
+        if (error === "permission-denied") {
+          stopLocationWatchRef.current?.();
+          stopLocationWatchRef.current = null;
+          setTracking(false);
+          trackingStartedAtRef.current = null;
+        }
+        setTrackingMessage(`${trackingErrorMessage(error)}${error === "permission-denied" ? "" : " 기존 경로는 유지하며 GPS 연결을 기다리고 있어요."}`);
+      });
+      if (trackingStartedAtRef.current === null) stopWatch();
+      else stopLocationWatchRef.current = stopWatch;
+    } catch {
+      setTracking(false);
+      setTrackingMessage("이 기기 또는 브라우저에서는 실시간 위치 기능을 사용할 수 없어요.");
+    }
+  };
+
+  const finishExploration = () => {
+    stopLocationWatchRef.current?.();
+    stopLocationWatchRef.current = null;
+    setTracking(false);
+    const route = liveRouteRef.current;
+    const startedAt = trackingStartedAtRef.current;
+    trackingStartedAtRef.current = null;
+    if (!route.length || startedAt === null) {
+      setTrackingMessage("위치를 한 번 이상 확인한 뒤 탐험을 저장할 수 있어요.");
+      return;
+    }
+    const firstPoint = route[0];
+    if (!firstPoint) return;
+    const savedDistance = liveDistanceRef.current;
+    const durationSeconds = Math.min(604_800, Math.max(1, Math.floor((Date.now() - startedAt) / 1_000)));
+    addExploration({
+      placeName: trackingName.trim() || `${profile.name}와의 탐험`,
+      visitDate: today(),
+      note: trackingNote.trim(),
+      latitude: firstPoint.latitude,
+      longitude: firstPoint.longitude,
+      route,
+      distanceMeters: Math.round(liveDistanceRef.current),
+      durationSeconds
+    });
+    setSelectedId(null);
+    setTrackingMessage(`${formatDistance(savedDistance)}의 탐험 경로를 이 계정에 저장했어요.`);
+    setLiveRoute([]);
+    liveRouteRef.current = [];
+    liveDistanceRef.current = 0;
+    setLiveDistance(0);
+    setTrackingSeconds(0);
+    setTrackingNote("");
+  };
+
   return <div className="pet-feature pet-exploration" data-testid="pet-exploration-overlay">
-    <FeatureHeader eyebrow="PET EXPLORATION MAP" title={`${profile.name}의 탐험`} copy="함께 다녀온 장소를 지도 위에 하나씩 모아보세요." />
+    <FeatureHeader eyebrow="PET EXPLORATION MAP" title={`${profile.name}의 탐험`} copy="함께 걷는 경로를 실시간으로 기록하고 지도에 차곡차곡 모아보세요." />
+    <section className={`live-exploration-card${tracking ? " tracking" : ""}`} data-testid="live-exploration-card">
+      <header><span aria-hidden="true">⌖</span><div><strong>{tracking ? "탐험 기록 중" : "실시간 탐험"}</strong><small>{tracking ? "이 화면을 켜둔 채 함께 움직여주세요." : "버튼을 누를 때만 위치 권한을 사용합니다."}</small></div><i aria-hidden="true" /></header>
+      <label><span>탐험 이름</span><input aria-label="실시간 탐험 이름" value={trackingName} onChange={(event) => setTrackingName(event.target.value)} maxLength={80} disabled={tracking} /></label>
+      <label><span>탐험 메모</span><input aria-label="경로 기록 메모" value={trackingNote} onChange={(event) => setTrackingNote(event.target.value)} maxLength={500} placeholder="선택 입력" /></label>
+      <div className="live-exploration-stats" aria-live="polite">
+        <span><b data-testid="live-exploration-point-count">{liveRoute.length}</b><small>위치 기록</small></span>
+        <span><b data-testid="live-exploration-distance">{formatDistance(liveDistance)}</b><small>이동 거리</small></span>
+        <span><b>{formatDuration(trackingSeconds)}</b><small>탐험 시간</small></span>
+      </div>
+      <p role="status">{trackingMessage}</p>
+      {tracking
+        ? <button className="finish-exploration-button" type="button" onClick={finishExploration}>탐험 종료 및 저장</button>
+        : <button className="start-exploration-button" type="button" onClick={startExploration}>탐험 시작</button>}
+    </section>
     <section className="exploration-map">
-      {selected ? <iframe title={`${selected.placeName} 지도`} src={mapUrl} loading="lazy" referrerPolicy="no-referrer" /> : <div className="map-empty"><span aria-hidden="true">⌖</span><strong>아직 지도에 표시할 장소가 없어요.</strong><small>현재 위치 또는 위도·경도를 입력해 첫 장소를 등록하세요.</small></div>}
-      {selected && <div className="map-caption"><span>⌖</span><div><strong>{selected.placeName}</strong><small>{selected.latitude.toFixed(4)}, {selected.longitude.toFixed(4)}</small></div><a href={`https://www.openstreetmap.org/?mlat=${selected.latitude}&mlon=${selected.longitude}#map=15/${selected.latitude}/${selected.longitude}`} target="_blank" rel="noreferrer">큰 지도</a></div>}
+      {mapUrl && mapBounds ? <div className="exploration-map-canvas"><iframe title={liveRoute.length ? "실시간 탐험 지도" : selected ? `${selected.placeName} 지도` : "누적 탐험 지도"} src={mapUrl} loading="lazy" referrerPolicy="no-referrer" /><ExplorationRouteOverlay explorations={explorations} liveRoute={liveRoute} selectedId={selected?.id ?? null} bounds={mapBounds} /></div> : <div className="map-empty"><span aria-hidden="true">⌖</span><strong>아직 지도에 표시할 탐험이 없어요.</strong><small>탐험 시작으로 경로를 기록하거나, 장소를 직접 등록해보세요.</small></div>}
+      {activeLocation && <div className="map-caption"><span>⌖</span><div><strong>{liveRoute.length ? "지금 이동 중" : selected?.placeName}</strong><small>{activeLocation.latitude.toFixed(4)}, {activeLocation.longitude.toFixed(4)} · 누적 {explorations.length}개</small></div><a href={`https://www.openstreetmap.org/?mlat=${activeLocation.latitude}&mlon=${activeLocation.longitude}#map=15/${activeLocation.latitude}/${activeLocation.longitude}`} target="_blank" rel="noreferrer">큰 지도</a></div>}
     </section>
     <details className="exploration-entry" open={!explorations.length}>
       <summary>＋ 함께한 장소 등록</summary>
@@ -222,12 +338,13 @@ export function PetExplorationOverlay() {
       </form>
     </details>
     <section className="exploration-list" aria-label="탐험 장소 목록">
-      {explorations.length ? explorations.map((place, index) => <article key={place.id} className={selected?.id === place.id ? "active" : ""}>
+      {explorations.length ? explorations.map((place, index) => <article key={place.id} className={`${selected?.id === place.id ? "active " : ""}${place.route.length ? "has-route" : ""}`.trim()}>
         <button type="button" className="place-select" onClick={() => setSelectedId(place.id)}><b>{String(explorations.length - index).padStart(2, "0")}</b><span><strong>{place.placeName}</strong><small>{formatDate(place.visitDate)} · {place.note || "함께한 장소"}</small></span></button>
+        {place.route.length > 0 && <span className="route-summary">{formatDistance(place.distanceMeters)} · {formatDuration(place.durationSeconds)}</span>}
         <button type="button" className="place-remove" aria-label={`${place.placeName} 장소 삭제`} onClick={() => { if (window.confirm("이 탐험 장소를 삭제할까요?")) removeExploration(place.id); }}>×</button>
       </article>) : null}
     </section>
-    <p className="pet-sensitive-note">지도는 OpenStreetMap을 사용합니다. 위치 등록은 사용자가 버튼을 누른 경우에만 요청하며, 정확한 집 주소처럼 민감한 위치는 저장하지 않는 것을 권장합니다.</p>
+    <p className="pet-sensitive-note">지도는 OpenStreetMap을 사용합니다. 실시간 위치는 사용자가 ‘탐험 시작’을 누른 동안에만 수집하며, 종료한 경로는 현재 로그인한 계정에 분리 저장됩니다. 정확한 집 주소처럼 민감한 위치에서 기록을 시작하지 않는 것을 권장합니다.</p>
   </div>;
 }
 
@@ -241,11 +358,90 @@ function formatDate(value: string): string {
   return new Date(`${value}T00:00:00`).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" });
 }
 
-function openStreetMapEmbed(place: PetExploration): string {
-  const latDelta = 0.012;
-  const lngDelta = 0.018;
-  const bbox = [place.longitude - lngDelta, place.latitude - latDelta, place.longitude + lngDelta, place.latitude + latDelta].join(",");
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${place.latitude}%2C${place.longitude}`;
+interface ExplorationMapBounds {
+  minLatitude: number;
+  maxLatitude: number;
+  minLongitude: number;
+  maxLongitude: number;
+}
+
+function ExplorationRouteOverlay({ explorations, liveRoute, selectedId, bounds }: {
+  explorations: PetExploration[];
+  liveRoute: ExplorationTrackPoint[];
+  selectedId: string | null;
+  bounds: ExplorationMapBounds;
+}) {
+  const routes = explorations.map((exploration) => ({
+    id: exploration.id,
+    points: exploration.route.length ? exploration.route : [{ latitude: exploration.latitude, longitude: exploration.longitude }],
+    selected: exploration.id === selectedId
+  }));
+  return <svg className="exploration-route-overlay" viewBox="0 0 1000 600" preserveAspectRatio="none" aria-label="저장된 탐험 경로 누적 표시">
+    {routes.map((route) => route.points.length > 1
+      ? <polyline key={route.id} className={route.selected ? "saved-route selected" : "saved-route"} points={route.points.map((point) => mapPoint(point, bounds)).join(" ")} />
+      : <circle key={route.id} className={route.selected ? "saved-place selected" : "saved-place"} {...mapCirclePoint(route.points[0]!, bounds)} r={route.selected ? 11 : 8} />)}
+    {liveRoute.length > 1 && <polyline className="live-route" points={liveRoute.map((point) => mapPoint(point, bounds)).join(" ")} />}
+    {liveRoute.length > 0 && <circle className="live-position-pulse" {...mapCirclePoint(liveRoute.at(-1)!, bounds)} r="13" />}
+  </svg>;
+}
+
+function explorationMapBounds(explorations: PetExploration[], liveStart?: ExplorationTrackPoint): ExplorationMapBounds | null {
+  const points = explorations.flatMap((exploration) => exploration.route.length
+    ? exploration.route
+    : [{ latitude: exploration.latitude, longitude: exploration.longitude }]);
+  if (liveStart) points.push(liveStart);
+  if (!points.length) return null;
+  const latitudes = points.map((point) => point.latitude);
+  const longitudes = points.map((point) => point.longitude);
+  const latitudeCenter = (Math.min(...latitudes) + Math.max(...latitudes)) / 2;
+  const longitudeCenter = (Math.min(...longitudes) + Math.max(...longitudes)) / 2;
+  const latitudeSpan = Math.max(0.018, Math.max(...latitudes) - Math.min(...latitudes));
+  const longitudeSpan = Math.max(0.028, Math.max(...longitudes) - Math.min(...longitudes));
+  return {
+    minLatitude: latitudeCenter - latitudeSpan * 0.65,
+    maxLatitude: latitudeCenter + latitudeSpan * 0.65,
+    minLongitude: longitudeCenter - longitudeSpan * 0.65,
+    maxLongitude: longitudeCenter + longitudeSpan * 0.65
+  };
+}
+
+function openStreetMapEmbed(bounds: ExplorationMapBounds, marker?: Pick<PetExploration, "latitude" | "longitude">): string {
+  const bbox = [bounds.minLongitude, bounds.minLatitude, bounds.maxLongitude, bounds.maxLatitude].join(",");
+  const markerQuery = marker ? `&marker=${marker.latitude}%2C${marker.longitude}` : "";
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik${markerQuery}`;
+}
+
+function mapPoint(point: Pick<ExplorationTrackPoint, "latitude" | "longitude">, bounds: ExplorationMapBounds): string {
+  const { cx, cy } = mapCirclePoint(point, bounds);
+  return `${cx},${cy}`;
+}
+
+function mapCirclePoint(point: Pick<ExplorationTrackPoint, "latitude" | "longitude">, bounds: ExplorationMapBounds): { cx: number; cy: number } {
+  return {
+    cx: ((point.longitude - bounds.minLongitude) / (bounds.maxLongitude - bounds.minLongitude)) * 1000,
+    cy: (1 - (point.latitude - bounds.minLatitude) / (bounds.maxLatitude - bounds.minLatitude)) * 600
+  };
+}
+
+function formatDistance(distanceMeters: number): string {
+  if (distanceMeters < 1_000) return `${Math.round(distanceMeters)}m`;
+  return `${(distanceMeters / 1_000).toFixed(distanceMeters >= 10_000 ? 1 : 2)}km`;
+}
+
+function formatDuration(durationSeconds: number): string {
+  const hours = Math.floor(durationSeconds / 3_600);
+  const minutes = Math.floor((durationSeconds % 3_600) / 60);
+  const seconds = Math.max(0, durationSeconds % 60);
+  if (hours) return `${hours}시간 ${minutes}분`;
+  if (minutes) return `${minutes}분 ${seconds}초`;
+  return `${seconds}초`;
+}
+
+function trackingErrorMessage(error: string): string {
+  if (error === "permission-denied") return "위치 권한이 꺼져 있어요. 브라우저 설정에서 위치를 허용한 뒤 다시 시작해주세요.";
+  if (error === "position-unavailable") return "현재 GPS 위치를 확인하지 못했어요. 하늘이 보이는 곳에서 다시 시도해주세요.";
+  if (error === "timeout") return "GPS 응답이 늦어지고 있어요. 네트워크와 위치 설정을 확인해주세요.";
+  return "이 기기에서는 실시간 위치 기능을 사용할 수 없어요.";
 }
 
 async function compressMemoryPhoto(file: File): Promise<string> {

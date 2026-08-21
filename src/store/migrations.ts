@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createDefaultSave } from "../domain/defaults";
+import { MAX_EXPLORATION_TRACK_POINTS } from "../domain/exploration";
 import type { GameSave } from "../domain/types";
 
 const needsSchema = z.object({
@@ -23,7 +24,7 @@ const petProfileSchema = z.object({
 });
 
 export const gameSaveSchema: z.ZodType<GameSave> = z.object({
-  version: z.literal(6),
+  version: z.literal(7),
   profile: petProfileSchema,
   tutorialComplete: z.boolean(),
   needs: needsSchema,
@@ -120,6 +121,14 @@ export const gameSaveSchema: z.ZodType<GameSave> = z.object({
     note: z.string().trim().max(500),
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
+    route: z.array(z.object({
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+      accuracy: z.number().min(0).max(10_000),
+      capturedAt: z.iso.datetime()
+    })).max(MAX_EXPLORATION_TRACK_POINTS),
+    distanceMeters: z.number().min(0).max(10_000_000),
+    durationSeconds: z.number().int().min(0).max(604_800),
     createdAt: z.iso.datetime()
   })).max(80)
 });
@@ -138,22 +147,28 @@ export function migrateSave(input: unknown, now = new Date()): RecoveryResult {
   if (input && typeof input === "object") {
     const legacy = input as Record<string, unknown>;
     const version = Number(legacy.version ?? 1);
-    if (version >= 1 && version <= 5) {
+    if (version >= 1 && version <= 6) {
       const base = createDefaultSave(now);
       const legacyProfile = legacy.profile && typeof legacy.profile === "object" ? legacy.profile as Record<string, unknown> : {};
       const legacyName = typeof legacyProfile.name === "string" && legacyProfile.name.trim()
         ? legacyProfile.name.trim().slice(0, 20)
         : base.profile.name;
+      const legacyExplorations = Array.isArray(legacy.petExplorations)
+        ? legacy.petExplorations.map((exploration) => exploration && typeof exploration === "object"
+          ? { ...exploration, route: [], distanceMeters: 0, durationSeconds: 0 }
+          : exploration)
+        : base.petExplorations;
       const merged: GameSave = {
         ...base,
         ...(legacy as Partial<GameSave>),
-        version: 6,
-        profile: version === 5
+        version: 7,
+        profile: version >= 5
           ? { ...base.profile, ...(legacyProfile as Partial<GameSave["profile"]>), name: legacyName }
           : { ...base.profile, name: legacyName },
         settings: { ...base.settings, ...((legacy.settings as Partial<GameSave["settings"]>) ?? {}) },
         stats: { ...base.stats, ...((legacy.stats as Partial<GameSave["stats"]>) ?? {}) },
-        lastSavedAt: typeof legacy.lastSavedAt === "string" ? legacy.lastSavedAt : now.toISOString()
+        lastSavedAt: typeof legacy.lastSavedAt === "string" ? legacy.lastSavedAt : now.toISOString(),
+        petExplorations: legacyExplorations as GameSave["petExplorations"]
       };
       const migrated = gameSaveSchema.safeParse(merged);
       if (migrated.success) return { status: "migrated", save: migrated.data };
