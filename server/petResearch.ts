@@ -8,7 +8,6 @@ import {
   type SupplementRisk
 } from "../src/domain/supplementRecommendation.js";
 import { cleanResearchAnswer } from "../src/platform/research/plainText.js";
-import { migrateSave } from "../src/store/migrations.js";
 import {
   buildPetResearchAccountSummary,
   decodeFirestoreDocumentOwner,
@@ -142,9 +141,9 @@ async function loadAccountContext(uid: string, token: string): Promise<AccountCo
     if (!firestoreResponse.ok) return { status: "unavailable" };
     const document = await firestoreResponse.json() as unknown;
     if (decodeFirestoreDocumentOwner(document) !== uid) return { status: "unavailable" };
-    const recovered = migrateSave(decodeFirestoreDocumentSave(document));
-    if (recovered.status === "corrupt") return { status: "unavailable" };
-    return { status: "loaded", summary: buildPetResearchAccountSummary(recovered.save) };
+    const summary = buildPetResearchAccountSummary(decodeFirestoreDocumentSave(document));
+    if (!summary.pet.name) return { status: "unavailable" };
+    return { status: "loaded", summary };
   } catch {
     return { status: "unavailable" };
   }

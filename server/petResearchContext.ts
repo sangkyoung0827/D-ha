@@ -1,12 +1,19 @@
-import { ITEM_BY_ID } from "../src/domain/catalog.js";
-import type { GameSave } from "../src/domain/types.js";
-
 export interface PetResearchAccountSummary {
   scope: "current-authenticated-account";
   savedAt: string;
-  pet: GameSave["profile"];
+  pet: {
+    name: string;
+    species: string;
+    breed: string;
+    furColor: string;
+    pattern: string;
+    collar: string;
+    hat: string;
+    accessory: string;
+    outfit: string;
+  };
   currentStatus: {
-    needs: GameSave["needs"];
+    needs: { satiety: number; hygiene: number; energy: number; joy: number; condition: number };
     level: number;
     xp: number;
     coins: number;
@@ -20,10 +27,20 @@ export interface PetResearchAccountSummary {
     decorations: string[];
     notifications: Array<{ title: string; body: string; kind: string; createdAt: string }>;
   };
-  activity: GameSave["stats"];
-  dailyGoals: GameSave["dailyGoals"];
+  activity: {
+    meals: number;
+    baths: number;
+    sleeps: number;
+    minigames: number;
+    minigameIds: string[];
+    totalMinigameScore: number;
+    purchases: number;
+    themeChanges: number;
+    careActions: number;
+  };
+  dailyGoals: Array<{ id: string; label: string; progress: number; target: number; completed: boolean }>;
   achievements: string[];
-  inventory: Array<{ name: string; quantity: number }>;
+  inventory: Array<{ itemId: string; quantity: number }>;
   equipped: Record<string, string | null>;
   medical: {
     bloodType: string;
@@ -47,69 +64,112 @@ export interface PetResearchAccountSummary {
     durationSeconds: number;
     hasRecordedRoute: boolean;
   }>;
-  highScores: GameSave["highScores"];
+  highScores: Record<string, number>;
 }
 
-export function buildPetResearchAccountSummary(save: GameSave): PetResearchAccountSummary {
+export function buildPetResearchAccountSummary(value: unknown): PetResearchAccountSummary {
+  const save = asRecord(value);
+  const profile = asRecord(save.profile);
+  const needs = asRecord(save.needs);
+  const stats = asRecord(save.stats);
+  const medical = asRecord(save.petMedical);
+  const hospital = asRecord(medical.hospital);
+  const equipped = asRecord(save.equipped);
   return {
     scope: "current-authenticated-account",
-    savedAt: save.lastSavedAt,
-    pet: { ...save.profile },
+    savedAt: textValue(save.lastSavedAt, 40),
+    pet: {
+      name: textValue(profile.name, 30),
+      species: textValue(profile.species, 20),
+      breed: textValue(profile.breed, 50),
+      furColor: textValue(profile.furColor, 30),
+      pattern: textValue(profile.pattern, 30),
+      collar: textValue(profile.collar, 30),
+      hat: textValue(profile.hat, 30),
+      accessory: textValue(profile.accessory, 30),
+      outfit: textValue(profile.outfit, 30)
+    },
     currentStatus: {
-      needs: { ...save.needs },
-      level: save.level,
-      xp: save.xp,
-      coins: save.coins,
-      lastCareAt: save.lastCareAt
+      needs: {
+        satiety: finiteNumber(needs.satiety),
+        hygiene: finiteNumber(needs.hygiene),
+        energy: finiteNumber(needs.energy),
+        joy: finiteNumber(needs.joy),
+        condition: finiteNumber(needs.condition)
+      },
+      level: finiteNumber(save.level),
+      xp: finiteNumber(save.xp),
+      coins: finiteNumber(save.coins),
+      lastCareAt: nullableText(save.lastCareAt, 40)
     },
     game: {
-      tutorialComplete: save.tutorialComplete,
-      loginStreak: save.loginStreak,
-      lastLoginDate: save.lastLoginDate,
-      roomTheme: save.roomTheme,
-      decorations: [...save.decorations],
-      notifications: save.notifications.map((notification) => ({
-        title: plainData(notification.title, 100),
-        body: plainData(notification.body, 180),
-        kind: notification.kind,
-        createdAt: notification.createdAt
-      }))
+      tutorialComplete: save.tutorialComplete === true,
+      loginStreak: finiteNumber(save.loginStreak),
+      lastLoginDate: textValue(save.lastLoginDate, 20),
+      roomTheme: textValue(save.roomTheme, 50),
+      decorations: asArray(save.decorations).map((decoration) => textValue(decoration, 80)).filter(Boolean),
+      notifications: asArray(save.notifications).map((value) => {
+        const notification = asRecord(value);
+        return {
+          title: textValue(notification.title, 100),
+          body: textValue(notification.body, 180),
+          kind: textValue(notification.kind, 30),
+          createdAt: textValue(notification.createdAt, 40)
+        };
+      })
     },
-    activity: { ...save.stats, minigameIds: [...save.stats.minigameIds] },
-    dailyGoals: save.dailyGoals.map((goal) => ({ ...goal })),
-    achievements: save.achievements.map((achievement) => achievement.id),
-    inventory: Object.entries(save.inventory)
-      .filter(([, quantity]) => quantity > 0)
-      .map(([id, quantity]) => ({ name: ITEM_BY_ID[id]?.name ?? id, quantity })),
-    equipped: Object.fromEntries(Object.entries(save.equipped).map(([slot, id]) => [slot, id ? ITEM_BY_ID[id]?.name ?? id : null])),
+    activity: {
+      meals: finiteNumber(stats.meals),
+      baths: finiteNumber(stats.baths),
+      sleeps: finiteNumber(stats.sleeps),
+      minigames: finiteNumber(stats.minigames),
+      minigameIds: asArray(stats.minigameIds).map((id) => textValue(id, 80)).filter(Boolean),
+      totalMinigameScore: finiteNumber(stats.totalMinigameScore),
+      purchases: finiteNumber(stats.purchases),
+      themeChanges: finiteNumber(stats.themeChanges),
+      careActions: finiteNumber(stats.careActions)
+    },
+    dailyGoals: asArray(save.dailyGoals).map((value) => {
+      const goal = asRecord(value);
+      return { id: textValue(goal.id, 40), label: textValue(goal.label, 100), progress: finiteNumber(goal.progress), target: finiteNumber(goal.target), completed: goal.completed === true };
+    }),
+    achievements: asArray(save.achievements).map((value) => textValue(asRecord(value).id, 80)).filter(Boolean),
+    inventory: Object.entries(asRecord(save.inventory))
+      .map(([itemId, quantity]) => ({ itemId: plainData(itemId, 100), quantity: finiteNumber(quantity) }))
+      .filter((item) => item.quantity > 0),
+    equipped: Object.fromEntries(Object.entries(equipped).map(([slot, itemId]) => [plainData(slot, 40), itemId === null ? null : textValue(itemId, 100)])),
     medical: {
-      bloodType: plainData(save.petMedical.bloodType, 30),
-      hospitalName: plainData(save.petMedical.hospital.hospitalName, 80),
-      connectionStatus: save.petMedical.hospital.status,
-      records: save.petMedical.records.map((record) => ({
-        visitDate: record.visitDate,
-        hospitalName: plainData(record.hospitalName, 80),
-        diagnosis: plainData(record.diagnosis, 120),
-        treatment: plainData(record.treatment, 180),
-        note: plainData(record.note, 180),
-        nextVisitDate: record.nextVisitDate
-      }))
+      bloodType: textValue(medical.bloodType, 30),
+      hospitalName: textValue(hospital.hospitalName, 80),
+      connectionStatus: textValue(hospital.status, 30),
+      records: asArray(medical.records).map((value) => {
+        const record = asRecord(value);
+        return {
+          visitDate: textValue(record.visitDate, 20),
+          hospitalName: textValue(record.hospitalName, 80),
+          diagnosis: textValue(record.diagnosis, 120),
+          treatment: textValue(record.treatment, 180),
+          note: textValue(record.note, 180),
+          nextVisitDate: nullableText(record.nextVisitDate, 20)
+        };
+      })
     },
-    diary: save.petMemories.map((memory) => ({
-      title: plainData(memory.title, 60),
-      memoryDate: memory.memoryDate,
-      note: plainData(memory.note, 220),
-      hasPhoto: Boolean(memory.photoDataUrl)
-    })),
-    explorations: save.petExplorations.map((exploration) => ({
-      placeName: plainData(exploration.placeName, 80),
-      visitDate: exploration.visitDate,
-      note: plainData(exploration.note, 220),
-      distanceMeters: Math.round(exploration.distanceMeters),
-      durationSeconds: exploration.durationSeconds,
-      hasRecordedRoute: exploration.route.length > 0
-    })),
-    highScores: { ...save.highScores }
+    diary: asArray(save.petMemories).map((value) => {
+      const memory = asRecord(value);
+      return { title: textValue(memory.title, 60), memoryDate: textValue(memory.memoryDate, 20), note: textValue(memory.note, 220), hasPhoto: typeof memory.photoDataUrl === "string" && memory.photoDataUrl.startsWith("data:image/") };
+    }),
+    explorations: asArray(save.petExplorations).map((value) => {
+      const exploration = asRecord(value);
+      return {
+        placeName: textValue(exploration.placeName, 80),
+        visitDate: textValue(exploration.visitDate, 20),
+        note: textValue(exploration.note, 220),
+        distanceMeters: Math.round(finiteNumber(exploration.distanceMeters)),
+        durationSeconds: Math.round(finiteNumber(exploration.durationSeconds)),
+        hasRecordedRoute: asArray(exploration.route).length > 0
+      };
+    }),
+    highScores: Object.fromEntries(Object.entries(asRecord(save.highScores)).map(([gameId, score]) => [plainData(gameId, 100), finiteNumber(score)]))
   };
 }
 
@@ -164,4 +224,25 @@ function plainData(value: string, limit: number): string {
     return code < 32 || code === 127 ? " " : character;
   }).join("");
   return withoutControls.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().slice(0, limit);
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function textValue(value: unknown, limit: number): string {
+  return typeof value === "string" ? plainData(value, limit) : "";
+}
+
+function nullableText(value: unknown, limit: number): string | null {
+  return value === null || value === undefined ? null : textValue(value, limit) || null;
+}
+
+function finiteNumber(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
