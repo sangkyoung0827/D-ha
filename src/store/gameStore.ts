@@ -5,6 +5,7 @@ import { ITEM_BY_ID, ITEM_CATALOG } from "../domain/catalog";
 import { createDefaultSave } from "../domain/defaults";
 import { progressDailyGoal, refreshDailyGoals, updateBalancedGoal, localDateKey } from "../domain/daily";
 import { calculateMiniGameReward, canPurchase, spendCoins } from "../domain/economy";
+import { attemptScheduledFeeding, changeFeedingFrequency, refreshFeedingPlan } from "../domain/feeding";
 import { levelFromXp, LEVEL_THRESHOLDS } from "../domain/progression";
 import { isOceanGame, oceanCompletionCopy, oceanGameNeedEffects } from "../domain/ocean";
 import { loadCloudGame, saveCloudGame } from "../platform/cloud/FirebaseGameSaveProvider";
@@ -12,6 +13,7 @@ import type {
   GameNotification,
   GameSave,
   GameSettings,
+  FeedingFrequency,
   MiniGameResult,
   NeedValues,
   PetExploration,
@@ -48,6 +50,8 @@ interface GameActions {
   setRoom(room: RoomId): void;
   setOverlay(overlay: OverlayId): void;
   care(kind: "feed" | "wash" | "sleep" | "wellness" | "play", itemId?: string): void;
+  feedScheduledMeal(): FeedingFeedback;
+  setFeedingFrequency(frequency: FeedingFrequency): void;
   purchase(itemId: string): void;
   equip(itemId: string): void;
   setTheme(itemId: string): void;
@@ -76,6 +80,13 @@ interface GameActions {
   demoTestNotification(): void;
 }
 
+export interface FeedingFeedback {
+  accepted: boolean;
+  message: string;
+  increment: number;
+  progress: number;
+}
+
 export type GameStore = GameSave & GameRuntime & GameActions;
 
 function addNotification(save: GameSave, notification: Omit<GameNotification, "id" | "createdAt">, now = new Date()): GameSave {
@@ -94,10 +105,11 @@ function addNotification(save: GameSave, notification: Omit<GameNotification, "i
 
 function saveFromStore(state: GameStore): GameSave {
   return {
-    version: 7,
+    version: 8,
     profile: state.profile,
     tutorialComplete: state.tutorialComplete,
     needs: state.needs,
+    feedingPlan: state.feedingPlan,
     lastSavedAt: state.lastSavedAt,
     lastCareAt: state.lastCareAt,
     coins: state.coins,
@@ -182,6 +194,7 @@ function prepareHydratedSave(save: GameSave, previous: GameSave, now: Date): Gam
   let prepared: GameSave = {
     ...save,
     needs: elapsed.needs,
+    feedingPlan: refreshFeedingPlan(save.feedingPlan, now),
     dailyDate: refreshDailyGoals(save.dailyDate, save.dailyGoals, now).date,
     dailyGoals: refreshDailyGoals(save.dailyDate, save.dailyGoals, now).goals,
     loginStreak: distance === 1 ? save.loginStreak + 1 : distance > 1 ? 1 : save.loginStreak,
@@ -370,6 +383,41 @@ export const useGameStore = create<GameStore>((set, get) => {
           now
         );
       }, careToast);
+    },
+
+    feedScheduledMeal() {
+      const now = new Date();
+      const state = get();
+      const result = attemptScheduledFeeding(state.feedingPlan, now);
+      const message = result.status === "all-complete"
+        ? "오늘 식사를 모두 완료했어요."
+        : result.status === "duplicate"
+          ? `이미 ${result.slotLabel}밥을 먹었어요.`
+          : `${result.slotLabel} 식사를 완료했어요! ${state.profile.name}가 맛있게 먹었어요 · 밥 게이지 +${result.increment}`;
+
+      if (result.status !== "completed") {
+        commit((save) => ({ ...save, feedingPlan: result.plan }), message);
+        return { accepted: false, message, increment: 0, progress: result.progressAfter };
+      }
+
+      commit((save) => {
+        const needs = applyNeedEffects(save.needs, { satiety: Math.max(20, result.increment), joy: 3 }, now.toISOString(), now);
+        const dailyGoals = progressDailyGoal(save.dailyGoals, "feed");
+        return addNotification({
+          ...save,
+          feedingPlan: result.plan,
+          needs,
+          dailyGoals,
+          stats: { ...save.stats, meals: save.stats.meals + 1, careActions: save.stats.careActions + 1 },
+          lastCareAt: now.toISOString()
+        }, { title: `${result.slotLabel} 식사 완료`, body: `${state.profile.name}가 맛있게 먹었어요. 밥 게이지 +${result.increment}`, kind: "care" }, now);
+      }, message);
+      return { accepted: true, message, increment: result.increment, progress: result.progressAfter };
+    },
+
+    setFeedingFrequency(frequency) {
+      const now = new Date();
+      commit((save) => ({ ...save, feedingPlan: changeFeedingFrequency(save.feedingPlan, frequency, now) }), `하루 급양 횟수를 ${frequency}회로 설정했어요.`);
     },
 
     purchase(itemId) {

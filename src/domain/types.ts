@@ -20,6 +20,15 @@ export interface NeedValues {
   condition: number;
 }
 
+export type FeedingFrequency = 1 | 2 | 3 | 4;
+export type FeedingSlotId = "daily" | "morning" | "midday" | "evening" | "night";
+
+export interface DailyFeedingPlan {
+  date: string;
+  dailyTarget: FeedingFrequency;
+  completedSlots: FeedingSlotId[];
+}
+
 export type ItemCategory =
   | "food"
   | "wellness"
@@ -172,10 +181,11 @@ export interface MiniGameResult {
 }
 
 export interface GameSave {
-  version: 7;
+  version: 8;
   profile: PetProfile;
   tutorialComplete: boolean;
   needs: NeedValues;
+  feedingPlan: DailyFeedingPlan;
   lastSavedAt: string;
   lastCareAt: string | null;
   coins: number;

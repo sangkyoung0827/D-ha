@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import type { PetProfile } from "../../domain/pet";
 import type { RoomId } from "../../domain/types";
 import { gameBridge } from "../../game/bridge/GameBridge";
+import { playFeedbackTone, vibrateFeedback } from "../../platform/audio/feedback";
+import { useGameStore } from "../../store/gameStore";
 import { PetAvatar } from "../pet/PetAvatar";
 import { PetResearchChat } from "./PetResearchChat";
 
@@ -20,7 +22,13 @@ type PetPlaceOverlay = "pet-hospital" | "pet-diary" | "pet-exploration" | "pet-s
 export function HomePetScene({ appearance, reducedMotion, onRoomChange, onOpenPlace }: { appearance: PetProfile; reducedMotion: boolean; onRoomChange(room: RoomId): void; onOpenPlace(overlay: PetPlaceOverlay): void }) {
   const [selectedPlace, setSelectedPlace] = useState<(typeof PET_PLACE_MENU)[number]>(PET_PLACE_MENU[2]);
   const [reaction, setReaction] = useState<PetReaction>(null);
+  const [feeding, setFeeding] = useState(false);
+  const [mealFeedback, setMealFeedback] = useState("");
+  const feedScheduledMeal = useGameStore((state) => state.feedScheduledMeal);
+  const settings = useGameStore((state) => state.settings);
   const reactionTimer = useRef<number | null>(null);
+  const feedingTimer = useRef<number | null>(null);
+  const feedbackTimer = useRef<number | null>(null);
 
   const react = (next: Exclude<PetReaction, null>) => {
     if (reactionTimer.current) window.clearTimeout(reactionTimer.current);
@@ -35,11 +43,27 @@ export function HomePetScene({ appearance, reducedMotion, onRoomChange, onOpenPl
     return () => {
       stop();
       if (reactionTimer.current) window.clearTimeout(reactionTimer.current);
+      if (feedingTimer.current) window.clearTimeout(feedingTimer.current);
+      if (feedbackTimer.current) window.clearTimeout(feedbackTimer.current);
     };
   }, []);
 
+  const giveMeal = () => {
+    const feedback = feedScheduledMeal();
+    setMealFeedback(feedback.message);
+    if (feedbackTimer.current) window.clearTimeout(feedbackTimer.current);
+    feedbackTimer.current = window.setTimeout(() => setMealFeedback(""), 3_200);
+    if (!feedback.accepted) return;
+    setFeeding(true);
+    gameBridge.emit("pet:react", { action: "feed" });
+    playFeedbackTone(settings.sound, 540);
+    vibrateFeedback(settings.vibration);
+    if (feedingTimer.current) window.clearTimeout(feedingTimer.current);
+    feedingTimer.current = window.setTimeout(() => setFeeding(false), 2_600);
+  };
+
   return <div
-    className={`home-pet-scene${reducedMotion ? " is-reduced" : ""}`}
+    className={`home-pet-scene${reducedMotion ? " is-reduced" : ""}${feeding ? " is-feeding" : ""}`}
     data-testid="home-pet-scene"
     data-species={appearance.species}
     data-breed={appearance.breed}
@@ -61,6 +85,11 @@ export function HomePetScene({ appearance, reducedMotion, onRoomChange, onOpenPl
       </button>
       <p className="home-pet-greeting"><strong>{appearance.name}</strong><span>방석에서 편안하게 쉬고 있어요</span></p>
     </div>
+    <button className="home-feed-action" type="button" data-testid="home-feed-bowl" aria-label="밥그릇 · 밥 주기" onClick={giveMeal}>
+      <span className="home-food-bowl" aria-hidden="true"><i /><b /><em>DIHA</em></span>
+      <strong>밥 주기</strong>
+    </button>
+    {mealFeedback && <p className="home-meal-feedback" role="status">{mealFeedback}</p>}
     <nav className="pet-place-menu" aria-label="반려동물 장소">
       <span className="pet-place-menu-title">PET PLACES</span>
       {PET_PLACE_MENU.map((place) => <button

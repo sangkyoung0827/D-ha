@@ -24,10 +24,15 @@ const petProfileSchema = z.object({
 });
 
 export const gameSaveSchema: z.ZodType<GameSave> = z.object({
-  version: z.literal(7),
+  version: z.literal(8),
   profile: petProfileSchema,
   tutorialComplete: z.boolean(),
   needs: needsSchema,
+  feedingPlan: z.object({
+    date: z.string(),
+    dailyTarget: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
+    completedSlots: z.array(z.enum(["daily", "morning", "midday", "evening", "night"])).max(4)
+  }),
   lastSavedAt: z.iso.datetime(),
   lastCareAt: z.iso.datetime().nullable(),
   coins: z.number().int().min(0),
@@ -147,21 +152,22 @@ export function migrateSave(input: unknown, now = new Date()): RecoveryResult {
   if (input && typeof input === "object") {
     const legacy = input as Record<string, unknown>;
     const version = Number(legacy.version ?? 1);
-    if (version >= 1 && version <= 6) {
+    if (version >= 1 && version <= 7) {
       const base = createDefaultSave(now);
       const legacyProfile = legacy.profile && typeof legacy.profile === "object" ? legacy.profile as Record<string, unknown> : {};
       const legacyName = typeof legacyProfile.name === "string" && legacyProfile.name.trim()
         ? legacyProfile.name.trim().slice(0, 20)
         : base.profile.name;
-      const legacyExplorations = Array.isArray(legacy.petExplorations)
+      const legacyExplorations = version <= 6 && Array.isArray(legacy.petExplorations)
         ? legacy.petExplorations.map((exploration) => exploration && typeof exploration === "object"
           ? { ...exploration, route: [], distanceMeters: 0, durationSeconds: 0 }
           : exploration)
-        : base.petExplorations;
+        : Array.isArray(legacy.petExplorations) ? legacy.petExplorations : base.petExplorations;
       const merged: GameSave = {
         ...base,
         ...(legacy as Partial<GameSave>),
-        version: 7,
+        version: 8,
+        feedingPlan: base.feedingPlan,
         profile: version >= 5
           ? { ...base.profile, ...(legacyProfile as Partial<GameSave["profile"]>), name: legacyName }
           : { ...base.profile, name: legacyName },

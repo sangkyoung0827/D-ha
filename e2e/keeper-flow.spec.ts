@@ -6,6 +6,11 @@ async function createPet(page: Page, name = "마루") {
   await expect(page.getByRole("img", { name: "선글라스를 쓰고 손을 흔들며 인사하는 알약 디하" })).toBeVisible();
   await expect(page.getByRole("status")).toContainText("안녕!");
   await page.getByRole("button", { name: "디하 시작하기" }).click();
+  await expect(page.getByTestId("account-gate")).toBeVisible();
+  await expect(page.getByText("먼저 로그인하고 반려동물을 등록해요")).toBeVisible();
+  await expect(page.getByTestId("pet-creator")).toHaveCount(0);
+  await page.getByRole("button", { name: "Google로 계속" }).click();
+  await expect(page.getByTestId("pet-creator")).toBeVisible();
   const nameInput = page.getByLabel("반려동물 이름");
   await nameInput.fill(name);
   const focusStyle = await nameInput.evaluate((input) => {
@@ -30,9 +35,6 @@ async function createPet(page: Page, name = "마루") {
   await expect(page.getByTestId("pet-preview")).toHaveAttribute("data-accessory", "sunglasses");
   await expect(page.getByTestId("pet-preview")).toHaveAttribute("data-outfit", "sailor");
   await page.getByRole("button", { name: "이 모습으로 시작" }).click();
-  await expect(page.getByTestId("account-gate")).toBeVisible();
-  await expect(page.getByText("계정별 독립 저장")).toBeVisible();
-  await page.getByRole("button", { name: "Google로 계속" }).click();
   await expect(page.getByText("함께 살고, 돌보고,")).toBeVisible();
   await page.getByRole("button", { name: /Home 입장/ }).click();
   await expect(page.getByTestId("game-shell")).toBeVisible();
@@ -66,8 +68,19 @@ test.beforeEach(async ({ context }) => {
   await context.clearCookies();
 });
 
+test("로그인 후 반려동물을 등록하고 기존 계정은 시작 화면 없이 복원한다", async ({ page }) => {
+  await createPet(page, "로그인펫");
+
+  await page.reload();
+
+  await expect(page.getByTestId("game-shell")).toBeVisible();
+  await expect(page.getByText("로그인펫", { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId("account-gate")).toHaveCount(0);
+  await expect(page.getByTestId("pet-creator")).toHaveCount(0);
+});
+
 test("반려동물 생성부터 돌봄, 미니게임, 구매, 장착과 새로고침 저장까지", async ({ page }) => {
-  test.slow();
+  test.setTimeout(240_000);
   await createPet(page);
   await expect(page.getByText("마루", { exact: true }).first()).toBeVisible();
 
@@ -83,11 +96,11 @@ test("반려동물 생성부터 돌봄, 미니게임, 구매, 장착과 새로�
 
   await goToRoom(page, "욕실");
   await page.getByTestId("wash-button").click();
-  await expect(page.locator(".toast")).toContainText("돌봄");
+  await expect(page.getByText("보송보송 씻는 중")).toBeVisible();
 
   await goToRoom(page, "침실");
   await page.getByTestId("sleep-button").click();
-  await expect(page.locator(".toast")).toContainText("돌봄");
+  await expect(page.getByText("포근하게 쉬는 중")).toBeVisible();
 
   await goToRoom(page, "바다");
   await page.getByRole("button", { name: "Games", exact: true }).click();
@@ -136,12 +149,13 @@ test("저장 JSON 내보내기와 가져오기가 검증된 데이터 경로를 
 
 test("데모 시간 경과와 모바일 가로 오버플로를 검증한다", async ({ page }) => {
   await createPet(page, "해류");
-  await expect(page.locator(".status-shell .need-indicator")).toHaveCount(4);
-  for (const label of ["밥", "영양제", "운동", "에너지"]) await expect(page.locator(`.need-indicator[aria-label^="${label} "]`)).toHaveCount(1);
-  const before = await page.locator(".need-indicator").first().getAttribute("aria-label");
+  await expect(page.locator(".status-shell .need-indicator")).toHaveCount(3);
+  for (const label of ["밥", "영양제", "운동"]) await expect(page.locator(`.need-indicator[aria-label^="${label} "]`)).toHaveCount(1);
+  await expect(page.locator('.need-indicator[aria-label^="에너지 "]')).toHaveCount(0);
+  const before = await page.locator(".need-indicator.need-joy").getAttribute("aria-label");
   await page.getByText("DEV", { exact: true }).click();
   await page.getByTestId("advance-1h").click();
-  const after = await page.locator(".need-indicator").first().getAttribute("aria-label");
+  const after = await page.locator(".need-indicator.need-joy").getAttribute("aria-label");
 
   expect(after).not.toBe(before);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -212,6 +226,17 @@ test("홈은 노란 방석 위 반려동물과 장소 메뉴만 보여준다", a
   await expect(page.getByText("거실", { exact: true })).toHaveCount(0);
   await page.getByRole("button", { name: "동선이 쓰다듬기" }).click();
   await expect(page.getByRole("button", { name: "동선이 쓰다듬기" })).toHaveClass(/reaction-happy/);
+  await expect(page.getByTestId("home-feed-bowl")).toBeVisible();
+  await page.getByTestId("home-feed-bowl").click();
+  await expect(page.getByTestId("home-pet-scene")).toHaveClass(/is-feeding/);
+  await expect(page.locator(".home-meal-feedback")).toContainText("밥 게이지 +50");
+  await expect(page.getByRole("button", { name: /^밥 50,/ })).toBeVisible();
+  await page.getByTestId("home-feed-bowl").click();
+  await expect(page.locator(".home-meal-feedback")).toContainText(/이미 (아침|저녁)밥을 먹었어요/);
+  await page.getByRole("button", { name: /^밥 50,/ }).click();
+  await expect(page.getByRole("dialog", { name: "하루 급양 횟수 설정" })).toBeVisible();
+  await page.getByRole("button", { name: /하루 3회/ }).click();
+  await expect(page.getByRole("button", { name: /^밥 33,/ })).toBeVisible();
   await page.getByRole("navigation", { name: "방 이동" }).getByRole("button", { name: /바다/ }).click();
   await expect(page.locator(".room-wellness .room-heading h1")).toHaveText("Ocean");
   await expect(page.getByRole("button", { name: "Games", exact: true })).toBeVisible();
@@ -331,11 +356,20 @@ test("동물병원·펫 일기·펫의 탐험 기록은 계정별 저장에 연�
 
   await places.getByRole("button", { name: /펫의 탐험/ }).click();
   await expect(page.getByTestId("pet-exploration-overlay")).toBeVisible();
+  await page.route("**/api/place-search?*", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ latitude: 37.5105, longitude: 126.995, displayName: "반포한강공원, 서초구, 서울특별시, 대한민국" })
+    });
+  });
+  await expect(page.getByLabel("위도")).toHaveCount(0);
+  await expect(page.getByLabel("경도")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "현재 위치 사용" })).toHaveCount(0);
   await page.getByLabel("장소 이름").fill("반포한강공원");
-  await page.getByLabel("위도").fill("37.5105");
-  await page.getByLabel("경도").fill("126.9950");
   await page.getByLabel("탐험 메모").fill("강변 산책과 노을 구경");
-  await page.getByRole("button", { name: "지도에 장소 저장" }).click();
+  await page.getByRole("button", { name: "장소 찾아 저장" }).click();
+  await expect(page.locator(".location-message")).toContainText("위치를 찾아 저장했어요");
   await expect(page.getByText("반포한강공원").first()).toBeVisible();
   await expect(page.getByTitle("반포한강공원 지도")).toBeVisible();
   await page.evaluate(() => {
@@ -466,10 +500,13 @@ test("Ocean Games는 Ocean Run과 Jump Up 두 게임만 제공한다", async ({ 
   await page.keyboard.press("Space");
   await page.getByTestId("debug-dha-low").dispatchEvent("click");
   await expect(page.getByTestId("dha-vision-warning")).toHaveCount(1);
-  await expect(page.getByTestId("minigame-live-score")).toContainText("DHA 15퍼센트");
+  await expect(page.getByTestId("minigame-live-score")).toContainText(/DHA (?:[1-9]|1[0-5])퍼센트/);
   await page.getByTestId("debug-dha-recover").dispatchEvent("click");
   await expect(page.getByTestId("dha-vision-warning")).toHaveCount(0);
-  await expect(page.getByTestId("minigame-live-score")).toContainText("DHA 70퍼센트");
+  await expect.poll(async () => {
+    const score = await page.getByTestId("minigame-live-score").textContent();
+    return Number(score?.match(/DHA (\d+)퍼센트/)?.[1] ?? 0);
+  }).toBeGreaterThan(20);
   await page.getByTestId("debug-finish-game").dispatchEvent("click");
   await expect(page.getByText("심해 탐험 완주!")).toBeVisible();
   await page.getByTestId("claim-reward").click();

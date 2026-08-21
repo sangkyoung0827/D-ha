@@ -2,7 +2,7 @@ import type { PetProfile } from "../../domain/pet";
 import { useAccount } from "../../platform/auth/AccountProvider";
 import { useGameStore } from "../../store/gameStore";
 
-export function GoogleSignInScreen({ profile, returning = false }: { profile: PetProfile; returning?: boolean }) {
+export function GoogleSignInScreen({ profile, returning = false, beforeRegistration = false }: { profile: PetProfile; returning?: boolean; beforeRegistration?: boolean }) {
   const { status, account, busy, error, signInWithGoogle } = useAccount();
   const syncStatus = useGameStore((state) => state.syncStatus);
   const syncMessage = useGameStore((state) => state.syncMessage);
@@ -12,13 +12,13 @@ export function GoogleSignInScreen({ profile, returning = false }: { profile: Pe
     <main className="onboarding account-screen ocean-gradient" data-testid="account-gate">
       <div className="account-orbit" aria-hidden="true"><i /><i /><i /></div>
       <div className="account-pet" aria-hidden="true">
-        <span>{profile.name.slice(0, 1)}</span>
+        <span>{beforeRegistration ? "D" : profile.name.slice(0, 1)}</span>
         <i>✦</i>
       </div>
       <p className="eyebrow">DIHA PLAYER ACCOUNT</p>
-      <h1>{returning ? `${profile.name}의 항해를 이어갈까요?` : `${profile.name}을 안전하게 저장할까요?`}</h1>
+      <h1>{beforeRegistration ? "먼저 로그인하고 반려동물을 등록해요" : returning ? `${profile.name}의 항해를 이어갈까요?` : `${profile.name}을 안전하게 저장할까요?`}</h1>
       <p className="account-copy">
-        Google 계정마다 반려동물, 아이템, 코인과 게임 진행을 완전히 분리해 저장합니다.
+        {beforeRegistration ? "로그인한 Google 계정에 반려동물 정보와 커스터마이징을 처음부터 연결합니다." : "Google 계정마다 반려동물, 아이템, 코인과 게임 진행을 완전히 분리해 저장합니다."}
       </p>
       <div className="account-benefits">
         <span><b>01</b><i>계정별 독립 저장</i></span>

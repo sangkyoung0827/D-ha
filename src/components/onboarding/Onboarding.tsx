@@ -27,9 +27,10 @@ export function Onboarding() {
   const { status: accountStatus, account } = useAccount();
   const [step, setStep] = useState<"intro" | "create" | "account" | "tour">("intro");
   const [draft, setDraft] = useState<PetProfile>(profile);
+  const accountReady = accountStatus === "signed-in" && account && hydratedOwner === `user:${account.uid}` && syncStatus !== "syncing";
 
-  const visibleStep = step === "account" && accountStatus === "signed-in" && account && hydratedOwner === `user:${account.uid}` && syncStatus !== "syncing"
-    ? "tour"
+  const visibleStep = step === "account" && accountReady
+    ? "create"
     : step;
 
   if (visibleStep === "intro") {
@@ -43,11 +44,13 @@ export function Onboarding() {
           <span className="pill-shadow" />
         </div>
         <div className="mascot-speech" role="status"><strong>안녕!</strong><span>나는 디하야. 우리 함께 새로운 일상을 시작해볼까?</span></div>
-        <button className="primary-button wide" onClick={() => setStep("create")}>디하 시작하기</button>
-        <small>의료 서비스가 아닌 가상 게임입니다. 생성 후 Google 계정에 안전하게 저장합니다.</small>
+        <button className="primary-button wide" onClick={() => setStep(accountReady ? "create" : "account")}>디하 시작하기</button>
+        <small>의료 서비스가 아닌 가상 게임입니다. 로그인 후 등록한 정보를 Google 계정에 안전하게 저장합니다.</small>
       </main>
     );
   }
+
+  if ((visibleStep === "account" || visibleStep === "create") && !accountReady) return <GoogleSignInScreen profile={profile} beforeRegistration />;
 
   if (visibleStep === "create") {
     const selectSpecies = (species: PetSpecies) => {
@@ -84,12 +87,10 @@ export function Onboarding() {
         <Picker label="모자" options={PET_HATS} value={draft.hat} onChange={(hat) => setDraft({ ...draft, hat })} />
         <Picker label="안경/액세서리" options={PET_ACCESSORIES} value={draft.accessory} onChange={(accessory) => setDraft({ ...draft, accessory })} />
         <Picker label="의상" options={PET_OUTFITS} value={draft.outfit} onChange={(outfit) => setDraft({ ...draft, outfit })} />
-        <button className="primary-button wide create-submit" disabled={!draft.name.trim()} onClick={() => { createPet({ ...draft, name: draft.name.trim() }); setStep(accountStatus === "signed-in" ? "tour" : "account"); }}>이 모습으로 시작</button>
+        <button className="primary-button wide create-submit" disabled={!draft.name.trim()} onClick={() => { createPet({ ...draft, name: draft.name.trim() }); setStep("tour"); }}>이 모습으로 시작</button>
       </main>
     );
   }
-
-  if (visibleStep === "account") return <GoogleSignInScreen profile={profile} />;
 
   return (
     <main className="onboarding tour-screen">

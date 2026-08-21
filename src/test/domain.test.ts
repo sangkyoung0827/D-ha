@@ -33,6 +33,7 @@ import { newestAccountSave } from "../store/accountSave";
 import { persistenceKeyForOwner } from "../store/persistence";
 import { isHomeInterior, topLevelRoom } from "../domain/home";
 import { calculateSupplementAssessment } from "../domain/supplementRecommendation";
+import { attemptScheduledFeeding, changeFeedingFrequency, createDailyFeedingPlan, feedingProgressPercent, refreshFeedingPlan } from "../domain/feeding";
 import {
   appendExplorationTrackPoint,
   distanceBetweenTrackPoints,
@@ -186,7 +187,7 @@ describe("진행 데이터", () => {
     expect(refreshed.goals.every((goal) => goal.progress === 0 && !goal.completed)).toBe(true);
   });
 
-  it("기존 사람 외형 저장을 진행 상태를 보존한 반려동물 v7 저장으로 마이그레이션한다", () => {
+  it("기존 사람 외형 저장을 진행 상태를 보존한 반려동물 v8 저장으로 마이그레이션한다", () => {
     const current = createDefaultSave(start);
     const legacyProfile = {
       name: current.profile.name,
@@ -199,7 +200,7 @@ describe("진행 데이터", () => {
     const result = migrateSave(legacy, start);
 
     expect(result.status).toBe("migrated");
-    expect(result.save.version).toBe(7);
+    expect(result.save.version).toBe(8);
     expect(result.save.profile.name).toBe(current.profile.name);
     expect(result.save.profile.breed).toBe("maltese");
     expect(result.save.coins).toBe(777);
@@ -228,7 +229,7 @@ describe("진행 데이터", () => {
     expect(result.save.petExplorations).toEqual([]);
   });
 
-  it("v6의 단일 탐험 장소를 빈 경로가 있는 v7 기록으로 안전하게 옮긴다", () => {
+  it("v6의 단일 탐험 장소를 빈 경로가 있는 v8 기록으로 안전하게 옮긴다", () => {
     const current = createDefaultSave(start);
     const previous = {
       ...current,
@@ -246,7 +247,7 @@ describe("진행 데이터", () => {
     const result = migrateSave(previous, start);
 
     expect(result.status).toBe("migrated");
-    expect(result.save.version).toBe(7);
+    expect(result.save.version).toBe(8);
     expect(result.save.petExplorations[0]).toMatchObject({ route: [], distanceMeters: 0, durationSeconds: 0 });
   });
 
@@ -257,8 +258,50 @@ describe("진행 데이터", () => {
     expect(malformed.status).toBe("corrupt");
     expect(malformed.backup).toBe("{not-json");
     expect(invalid.status).toBe("corrupt");
-    expect(invalid.save.version).toBe(7);
+    expect(invalid.save.version).toBe(8);
     expect(invalid.save.coins).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("일일 급양", () => {
+  const morning = new Date(2026, 7, 22, 8, 0, 0);
+  const evening = new Date(2026, 7, 22, 18, 0, 0);
+
+  it("기본 아침·저녁 두 끼를 각각 50으로 기록하고 같은 식사는 중복 처리하지 않는다", () => {
+    const plan = createDailyFeedingPlan(morning);
+    const breakfast = attemptScheduledFeeding(plan, morning);
+    const duplicateBreakfast = attemptScheduledFeeding(breakfast.plan, new Date(2026, 7, 22, 9, 30, 0));
+    const dinner = attemptScheduledFeeding(breakfast.plan, evening);
+    const afterComplete = attemptScheduledFeeding(dinner.plan, new Date(2026, 7, 22, 20, 0, 0));
+
+    expect(breakfast).toMatchObject({ status: "completed", slotLabel: "아침", increment: 50, progressAfter: 50 });
+    expect(duplicateBreakfast).toMatchObject({ status: "duplicate", increment: 0, progressAfter: 50 });
+    expect(dinner).toMatchObject({ status: "completed", slotLabel: "저녁", increment: 50, progressAfter: 100 });
+    expect(afterComplete.status).toBe("all-complete");
+  });
+
+  it("보호자가 급양 횟수를 바꿔도 오늘 완료 횟수를 보존하고 다음 날에는 게이지를 초기화한다", () => {
+    const breakfast = attemptScheduledFeeding(createDailyFeedingPlan(morning), morning);
+    const threeMeals = changeFeedingFrequency(breakfast.plan, 3, morning);
+    const nextDay = refreshFeedingPlan(threeMeals, new Date(2026, 7, 23, 8, 0, 0));
+
+    expect(threeMeals.dailyTarget).toBe(3);
+    expect(threeMeals.completedSlots).toEqual(["morning"]);
+    expect(feedingProgressPercent(threeMeals, morning)).toBe(33);
+    expect(nextDay.completedSlots).toEqual([]);
+    expect(feedingProgressPercent(nextDay, new Date(2026, 7, 23, 8, 0, 0))).toBe(0);
+  });
+
+  it("v7 저장에 기본 하루 2회 급양 계획을 추가해 마이그레이션한다", () => {
+    const current = createDefaultSave(morning);
+    const previous = { ...current, version: 7 } as Record<string, unknown>;
+    delete previous.feedingPlan;
+
+    const result = migrateSave(previous, morning);
+
+    expect(result.status).toBe("migrated");
+    expect(result.save.version).toBe(8);
+    expect(result.save.feedingPlan).toEqual({ date: "2026-08-22", dailyTarget: 2, completedSlots: [] });
   });
 });
 

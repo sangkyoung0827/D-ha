@@ -3,6 +3,7 @@ import { loadEnv, type HtmlTagDescriptor, type Plugin } from "vite";
 import { defineConfig } from "vitest/config";
 import { VitePWA } from "vite-plugin-pwa";
 import { petResearchHandler } from "./server/petResearch";
+import { placeSearchHandler } from "./server/placeSearch";
 
 function petResearchDevApi(): Plugin {
   const attach = (middlewares: { use(path: string, handler: (request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse) => void): void }) => {
@@ -12,6 +13,23 @@ function petResearchDevApi(): Plugin {
   };
   return {
     name: "diha-pet-research-dev-api",
+    configureServer(server) {
+      attach(server.middlewares);
+    },
+    configurePreviewServer(server) {
+      attach(server.middlewares);
+    }
+  };
+}
+
+function placeSearchDevApi(): Plugin {
+  const attach = (middlewares: { use(path: string, handler: (request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse) => void): void }) => {
+    middlewares.use("/api/place-search", (request, response) => {
+      void placeSearchHandler(request, response);
+    });
+  };
+  return {
+    name: "diha-place-search-dev-api",
     configureServer(server) {
       attach(server.middlewares);
     },
@@ -58,6 +76,7 @@ export default defineConfig(({ mode }) => {
       seoStaticRoutes(),
       searchVerificationMeta(env),
       petResearchDevApi(),
+      placeSearchDevApi(),
       VitePWA({
       registerType: "prompt",
       manifestFilename: "app.webmanifest",

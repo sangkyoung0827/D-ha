@@ -5,6 +5,7 @@ import { breedDefinition } from "../../domain/pet";
 import { useGameStore } from "../../store/gameStore";
 import { cameraProvider } from "../../platform/camera/CameraProvider";
 import { locationProvider } from "../../platform/location/LocationProvider";
+import { placeGeocoder, PlaceGeocoderError } from "../../platform/location/PlaceGeocoder";
 
 function FeatureHeader({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) {
   return <header className="pet-feature-header"><p>{eyebrow}</p><h2 id="sheet-title">{title}</h2><span>{copy}</span></header>;
@@ -166,9 +167,8 @@ export function PetExplorationOverlay() {
   const explorations = useGameStore((state) => state.petExplorations);
   const addExploration = useGameStore((state) => state.addPetExploration);
   const removeExploration = useGameStore((state) => state.removePetExploration);
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
   const [locationMessage, setLocationMessage] = useState("");
+  const [placeSearching, setPlaceSearching] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(explorations[0]?.id ?? null);
   const [tracking, setTracking] = useState(false);
   const [liveRoute, setLiveRoute] = useState<ExplorationTrackPoint[]>([]);
@@ -199,34 +199,36 @@ export function PetExplorationOverlay() {
     return () => window.clearInterval(timer);
   }, [tracking]);
 
-  const requestCurrentLocation = async () => {
-    setLocationMessage("현재 위치를 확인하는 중...");
-    try {
-      const position = await locationProvider.current();
-      setLatitude(position.latitude.toFixed(6));
-      setLongitude(position.longitude.toFixed(6));
-      setLocationMessage("현재 위치를 입력했어요.");
-    } catch (error) {
-      setLocationMessage(error instanceof Error && error.message === "unsupported" ? "이 기기는 위치 기능을 지원하지 않아요." : "위치 권한이 허용되지 않았어요. 위도와 경도를 직접 입력할 수 있어요.");
-    }
-  };
-
-  const submit = (event: FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (placeSearching) return;
     const form = event.currentTarget;
     const data = new FormData(form);
-    const lat = Number(latitude);
-    const lng = Number(longitude);
-    if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) {
-      setLocationMessage("올바른 위도와 경도를 입력해주세요.");
-      return;
+    const placeName = String(data.get("placeName") ?? "").trim();
+    setPlaceSearching(true);
+    setLocationMessage(`‘${placeName}’ 위치를 지도에서 찾는 중이에요.`);
+    try {
+      const location = await placeGeocoder.search(placeName);
+      addExploration({
+        placeName,
+        visitDate: String(data.get("visitDate") ?? ""),
+        note: String(data.get("note") ?? "").trim(),
+        latitude: location.latitude,
+        longitude: location.longitude,
+        route: [],
+        distanceMeters: 0,
+        durationSeconds: 0
+      });
+      form.reset();
+      setLocationMessage(`‘${location.displayName}’ 위치를 찾아 저장했어요.`);
+      setSelectedId(null);
+    } catch (error) {
+      setLocationMessage(error instanceof PlaceGeocoderError && error.code === "not-found"
+        ? "장소를 찾지 못했어요. 시·구 이름을 함께 입력해주세요."
+        : "지도 검색 연결이 원활하지 않아요. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setPlaceSearching(false);
     }
-    addExploration({ placeName: String(data.get("placeName") ?? "").trim(), visitDate: String(data.get("visitDate") ?? ""), note: String(data.get("note") ?? "").trim(), latitude: lat, longitude: lng, route: [], distanceMeters: 0, durationSeconds: 0 });
-    form.reset();
-    setLatitude("");
-    setLongitude("");
-    setLocationMessage("");
-    setSelectedId(null);
   };
 
   const startExploration = () => {
@@ -321,20 +323,17 @@ export function PetExplorationOverlay() {
         : <button className="start-exploration-button" type="button" onClick={startExploration}>탐험 시작</button>}
     </section>
     <section className="exploration-map">
-      {mapUrl && mapBounds ? <div className="exploration-map-canvas"><iframe title={liveRoute.length ? "실시간 탐험 지도" : selected ? `${selected.placeName} 지도` : "누적 탐험 지도"} src={mapUrl} loading="lazy" referrerPolicy="no-referrer" /><ExplorationRouteOverlay explorations={explorations} liveRoute={liveRoute} selectedId={selected?.id ?? null} bounds={mapBounds} /></div> : <div className="map-empty"><span aria-hidden="true">⌖</span><strong>아직 지도에 표시할 탐험이 없어요.</strong><small>탐험 시작으로 경로를 기록하거나, 장소를 직접 등록해보세요.</small></div>}
+      {mapUrl && mapBounds ? <div className="exploration-map-canvas"><iframe title={liveRoute.length ? "실시간 탐험 지도" : selected ? `${selected.placeName} 지도` : "누적 탐험 지도"} src={mapUrl} loading="lazy" referrerPolicy="no-referrer" /><ExplorationRouteOverlay explorations={explorations} liveRoute={liveRoute} selectedId={selected?.id ?? null} bounds={mapBounds} /></div> : <div className="map-empty"><span aria-hidden="true">⌖</span><strong>아직 지도에 표시할 탐험이 없어요.</strong><small>탐험 시작으로 경로를 기록하거나, 장소 이름을 검색해 등록해보세요.</small></div>}
       {activeLocation && <div className="map-caption"><span>⌖</span><div><strong>{liveRoute.length ? "지금 이동 중" : selected?.placeName}</strong><small>{activeLocation.latitude.toFixed(4)}, {activeLocation.longitude.toFixed(4)} · 누적 {explorations.length}개</small></div><a href={`https://www.openstreetmap.org/?mlat=${activeLocation.latitude}&mlon=${activeLocation.longitude}#map=15/${activeLocation.latitude}/${activeLocation.longitude}`} target="_blank" rel="noreferrer">큰 지도</a></div>}
     </section>
     <details className="exploration-entry" open={!explorations.length}>
       <summary>＋ 함께한 장소 등록</summary>
       <form className="pet-feature-form" onSubmit={submit}>
-        <label className="full"><span>장소 이름</span><input name="placeName" required maxLength={80} placeholder="예: 한강공원 반포지구" /></label>
-        <label><span>방문일</span><input name="visitDate" required type="date" defaultValue={today()} /></label>
-        <button className="location-button" type="button" onClick={() => void requestCurrentLocation()}>⌖ 현재 위치 사용</button>
-        <label><span>위도</span><input name="latitude" required inputMode="decimal" value={latitude} onChange={(event) => setLatitude(event.target.value)} placeholder="37.5665" /></label>
-        <label><span>경도</span><input name="longitude" required inputMode="decimal" value={longitude} onChange={(event) => setLongitude(event.target.value)} placeholder="126.9780" /></label>
-        <label className="full"><span>탐험 메모</span><textarea name="note" maxLength={500} placeholder="함께 무엇을 했는지 기록해보세요." /></label>
+        <label className="full"><span>장소 이름</span><input name="placeName" required maxLength={80} placeholder="예: 반포한강공원" /><small className="geocode-hint">장소 이름만 입력하면 지도에서 위치를 자동으로 찾아요.</small></label>
+        <label className="full"><span>방문일</span><input name="visitDate" required type="date" defaultValue={today()} /></label>
+        <label className="full"><span>탐험 메모</span><textarea name="note" maxLength={500} placeholder="함께 무엇을 했는지 기록해보세요. (선택)" /></label>
         {locationMessage && <p className="location-message" role="status">{locationMessage}</p>}
-        <button className="primary-button" type="submit">지도에 장소 저장</button>
+        <button className="primary-button full" type="submit" disabled={placeSearching}>{placeSearching ? "지도에서 장소 찾는 중..." : "장소 찾아 저장"}</button>
       </form>
     </details>
     <section className="exploration-list" aria-label="탐험 장소 목록">
@@ -344,7 +343,7 @@ export function PetExplorationOverlay() {
         <button type="button" className="place-remove" aria-label={`${place.placeName} 장소 삭제`} onClick={() => { if (window.confirm("이 탐험 장소를 삭제할까요?")) removeExploration(place.id); }}>×</button>
       </article>) : null}
     </section>
-    <p className="pet-sensitive-note">지도는 OpenStreetMap을 사용합니다. 실시간 위치는 사용자가 ‘탐험 시작’을 누른 동안에만 수집하며, 종료한 경로는 현재 로그인한 계정에 분리 저장됩니다. 정확한 집 주소처럼 민감한 위치에서 기록을 시작하지 않는 것을 권장합니다.</p>
+    <p className="pet-sensitive-note">장소 이름 검색과 지도는 OpenStreetMap을 사용합니다. 실시간 위치는 사용자가 ‘탐험 시작’을 누른 동안에만 수집하며, 저장한 장소와 종료한 경로는 현재 로그인한 계정에 분리 저장됩니다. 정확한 집 주소처럼 민감한 위치에서 기록을 시작하지 않는 것을 권장합니다.</p>
   </div>;
 }
 
