@@ -95,11 +95,11 @@ export function PetResearchChat({ pet }: { pet: PetProfile }) {
   return <section className={`pet-research-chat${expanded ? " is-expanded" : ""}`} aria-label="헤더 펫 연구원">
     <header>
       <span aria-hidden="true">H</span>
-      <div><strong>헤더 펫 연구원</strong><small>논문과 공식 연구자료를 찾아봐요</small></div>
+      <div><strong>헤더 펫 연구원</strong><small>내 Diha 기록과 공식 연구자료를 함께 살펴봐요</small></div>
       {expanded && <button type="button" aria-label="펫 연구원 접기" onClick={() => setExpanded(false)}>⌄</button>}
     </header>
     {expanded && <div className="pet-research-messages" ref={listRef} aria-live="polite">
-      {messages.length === 0 && <div className="pet-research-empty"><strong>{pet.name}에 관해 궁금한 점이 있나요?</strong><span>건강, 영양, 행동에 관한 질문을 입력해 주세요.</span></div>}
+      {messages.length === 0 && <div className="pet-research-empty"><strong>{pet.name}에 관해 궁금한 점이 있나요?</strong><span>일기, 탐험, 건강, 영양 기록을 물어보세요.</span></div>}
       {messages.map((message) => <article key={message.id} className={`${message.role}${message.failed ? " failed" : ""}`}>
         <b>{message.role === "assistant" ? "헤더" : "나"}</b>
         <p>{message.content}</p>
@@ -116,7 +116,7 @@ export function PetResearchChat({ pet }: { pet: PetProfile }) {
       <input id={inputId} value={question} maxLength={700} placeholder={`${pet.name}에 대해 무엇이든 물어보세요`} onFocus={() => setExpanded(true)} onChange={(event) => setQuestion(event.target.value)} disabled={sending} />
       <button type="submit" aria-label="질문 보내기" disabled={sending || !question.trim()}><span aria-hidden="true">↑</span></button>
     </form>
-    <footer>연구자료 기반 일반 정보이며 수의사의 진료를 대신하지 않습니다.</footer>
+    <footer>현재 로그인 계정의 기록만 사용하며, 의학적 답변은 수의사의 진료를 대신하지 않습니다.</footer>
   </section>;
 }
 
