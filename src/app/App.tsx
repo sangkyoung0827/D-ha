@@ -30,6 +30,7 @@ export function App() {
   const profile = useGameStore((state) => state.profile);
   const needs = useGameStore((state) => state.needs);
   const feedingPlan = useGameStore((state) => state.feedingPlan);
+  const dailyExercise = useGameStore((state) => state.dailyExercise);
   const level = useGameStore((state) => state.level);
   const currentRoom = useGameStore((state) => state.currentRoom);
   const roomTheme = useGameStore((state) => state.roomTheme);
@@ -47,6 +48,7 @@ export function App() {
   const completeMiniGame = useGameStore((state) => state.completeMiniGame);
   const care = useGameStore((state) => state.care);
   const setFeedingFrequency = useGameStore((state) => state.setFeedingFrequency);
+  const setExerciseGoal = useGameStore((state) => state.setExerciseGoal);
   const clearToast = useGameStore((state) => state.clearToast);
   const resetGame = useGameStore((state) => state.resetGame);
   const [bathProgress, setBathProgress] = useState(0);
@@ -126,7 +128,7 @@ export function App() {
     <div className={`app-background theme-${roomTheme} ${settings.reducedMotion ? "reduced-motion" : ""}`}>
       <div className="wide-ocean" aria-hidden="true"><i /><i /><i /></div>
       <main className={`game-shell${activeMiniGame ? " is-playing" : ""}`} data-testid="game-shell">
-        <StatusBar needs={needs} feedingPlan={feedingPlan} onFeedingFrequencyChange={setFeedingFrequency} />
+        <StatusBar needs={needs} feedingPlan={feedingPlan} exercisePlan={dailyExercise} onFeedingFrequencyChange={setFeedingFrequency} onExerciseGoalChange={setExerciseGoal} />
         <GameRoom room={currentRoom} petName={profile.name} immersive={Boolean(activeMiniGame)}>
           {!activeMiniGame && currentRoom === "studio"
             ? <HomePetScene appearance={profile} reducedMotion={settings.reducedMotion} onRoomChange={(room) => { setBathProgress(0); setRoom(room); }} onOpenPlace={setOverlay} />

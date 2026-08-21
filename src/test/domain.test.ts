@@ -34,6 +34,7 @@ import { persistenceKeyForOwner } from "../store/persistence";
 import { isHomeInterior, topLevelRoom } from "../domain/home";
 import { calculateSupplementAssessment } from "../domain/supplementRecommendation";
 import { attemptScheduledFeeding, changeFeedingFrequency, createDailyFeedingPlan, feedingProgressPercent, refreshFeedingPlan } from "../domain/feeding";
+import { addDailyExerciseDistance, createDailyExercisePlan, dailyExerciseProgressPercent, refreshDailyExercise, setDailyExerciseGoal } from "../domain/exercise";
 import {
   appendExplorationTrackPoint,
   distanceBetweenTrackPoints,
@@ -187,7 +188,7 @@ describe("진행 데이터", () => {
     expect(refreshed.goals.every((goal) => goal.progress === 0 && !goal.completed)).toBe(true);
   });
 
-  it("기존 사람 외형 저장을 진행 상태를 보존한 반려동물 v8 저장으로 마이그레이션한다", () => {
+  it("기존 사람 외형 저장을 진행 상태를 보존한 반려동물 v9 저장으로 마이그레이션한다", () => {
     const current = createDefaultSave(start);
     const legacyProfile = {
       name: current.profile.name,
@@ -200,7 +201,7 @@ describe("진행 데이터", () => {
     const result = migrateSave(legacy, start);
 
     expect(result.status).toBe("migrated");
-    expect(result.save.version).toBe(8);
+    expect(result.save.version).toBe(9);
     expect(result.save.profile.name).toBe(current.profile.name);
     expect(result.save.profile.breed).toBe("maltese");
     expect(result.save.coins).toBe(777);
@@ -229,7 +230,7 @@ describe("진행 데이터", () => {
     expect(result.save.petExplorations).toEqual([]);
   });
 
-  it("v6의 단일 탐험 장소를 빈 경로가 있는 v8 기록으로 안전하게 옮긴다", () => {
+  it("v6의 단일 탐험 장소를 빈 경로가 있는 v9 기록으로 안전하게 옮긴다", () => {
     const current = createDefaultSave(start);
     const previous = {
       ...current,
@@ -247,7 +248,7 @@ describe("진행 데이터", () => {
     const result = migrateSave(previous, start);
 
     expect(result.status).toBe("migrated");
-    expect(result.save.version).toBe(8);
+    expect(result.save.version).toBe(9);
     expect(result.save.petExplorations[0]).toMatchObject({ route: [], distanceMeters: 0, durationSeconds: 0 });
   });
 
@@ -258,7 +259,7 @@ describe("진행 데이터", () => {
     expect(malformed.status).toBe("corrupt");
     expect(malformed.backup).toBe("{not-json");
     expect(invalid.status).toBe("corrupt");
-    expect(invalid.save.version).toBe(8);
+    expect(invalid.save.version).toBe(9);
     expect(invalid.save.coins).toBeGreaterThanOrEqual(0);
   });
 });
@@ -300,8 +301,44 @@ describe("일일 급양", () => {
     const result = migrateSave(previous, morning);
 
     expect(result.status).toBe("migrated");
-    expect(result.save.version).toBe(8);
+    expect(result.save.version).toBe(9);
     expect(result.save.feedingPlan).toEqual({ date: "2026-08-22", dailyTarget: 2, completedSlots: [] });
+  });
+});
+
+describe("오늘의 운동", () => {
+  const morning = new Date(2026, 7, 22, 8, 0, 0);
+
+  it("GPS 이동 거리를 미터 단위로 누적하고 목표 대비 게이지를 계산한다", () => {
+    const plan = createDailyExercisePlan(morning, 1_000);
+    const moved = addDailyExerciseDistance(plan, 275.4, morning);
+    const customGoal = setDailyExerciseGoal(moved, 500, morning);
+
+    expect(moved.distanceMeters).toBe(275);
+    expect(dailyExerciseProgressPercent(moved, morning)).toBe(28);
+    expect(customGoal.goalMeters).toBe(500);
+    expect(customGoal.distanceMeters).toBe(275);
+    expect(dailyExerciseProgressPercent(customGoal, morning)).toBe(55);
+  });
+
+  it("날짜가 바뀌면 이동량만 초기화하고 보호자가 정한 목표는 유지한다", () => {
+    const moved = addDailyExerciseDistance(createDailyExercisePlan(morning, 2_000), 840, morning);
+    const nextDay = refreshDailyExercise(moved, new Date(2026, 7, 23, 8, 0, 0));
+
+    expect(nextDay).toEqual({ date: "2026-08-23", goalMeters: 2_000, distanceMeters: 0 });
+  });
+
+  it("v8 저장에 기본 운동 목표를 추가하면서 급양 기록은 유지한다", () => {
+    const current = createDefaultSave(morning);
+    const previous = { ...current, version: 8, feedingPlan: { ...current.feedingPlan, completedSlots: ["morning"] } } as Record<string, unknown>;
+    delete previous.dailyExercise;
+
+    const result = migrateSave(previous, morning);
+
+    expect(result.status).toBe("migrated");
+    expect(result.save.version).toBe(9);
+    expect(result.save.feedingPlan.completedSlots).toEqual(["morning"]);
+    expect(result.save.dailyExercise).toEqual({ date: "2026-08-22", goalMeters: 1_000, distanceMeters: 0 });
   });
 });
 

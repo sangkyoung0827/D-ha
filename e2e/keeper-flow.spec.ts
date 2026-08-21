@@ -79,6 +79,60 @@ test("로그인 후 반려동물을 등록하고 기존 계정은 시작 화면 
   await expect(page.getByTestId("pet-creator")).toHaveCount(0);
 });
 
+test("모바일은 앱 폭을 유지하고 태블릿·노트북은 전체 화면 레이아웃을 사용한다", async ({ page }) => {
+  await createPet(page, "반응형이");
+  const layout = await page.evaluate(() => {
+    const shell = document.querySelector<HTMLElement>(".game-shell")!.getBoundingClientRect();
+    const stage = document.querySelector<HTMLElement>(".game-stage")!.getBoundingClientRect();
+    const status = document.querySelector<HTMLElement>(".status-shell")!.getBoundingClientRect();
+    const navigation = document.querySelector<HTMLElement>(".room-nav")!.getBoundingClientRect();
+    return {
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      shellWidth: shell.width,
+      shellHeight: shell.height,
+      stageHeight: stage.height,
+      statusLeft: status.left,
+      navigationWidth: navigation.width,
+      navigationBottom: window.innerHeight - navigation.bottom,
+      horizontalOverflow: document.documentElement.scrollWidth - window.innerWidth
+    };
+  });
+
+  expect(layout.horizontalOverflow).toBeLessThanOrEqual(1);
+  if (layout.viewportWidth >= 768) {
+    expect(layout.shellWidth).toBeGreaterThanOrEqual(layout.viewportWidth - 1);
+    expect(layout.shellHeight).toBeGreaterThanOrEqual(layout.viewportHeight - 1);
+    expect(layout.stageHeight).toBeGreaterThanOrEqual(layout.viewportHeight - 1);
+    expect(layout.statusLeft).toBeGreaterThanOrEqual(23);
+    expect(layout.navigationWidth).toBeLessThanOrEqual(560);
+    expect(layout.navigationBottom).toBeGreaterThanOrEqual(23);
+  } else {
+    expect(layout.shellWidth).toBeLessThanOrEqual(460);
+    expect(layout.navigationWidth).toBeLessThanOrEqual(460);
+    expect(layout.statusLeft).toBe(0);
+    expect(layout.navigationBottom).toBe(0);
+    const mobileActions = await page.evaluate(() => {
+      const bounds = (selector: string) => document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+      const download = bounds(".pwa-download-button");
+      const feed = bounds(".home-feed-action");
+      const pet = bounds(".home-pet-touch");
+      const menu = bounds(".pet-place-menu");
+      return {
+        downloadBottom: download.bottom,
+        feedLeft: feed.left,
+        feedTop: feed.top,
+        petRight: pet.right,
+        menuTop: menu.top,
+        menuBottom: menu.bottom
+      };
+    });
+    expect(mobileActions.downloadBottom).toBeLessThan(mobileActions.menuTop);
+    expect(mobileActions.feedLeft).toBeGreaterThanOrEqual(mobileActions.petRight);
+    expect(mobileActions.feedTop).toBeGreaterThanOrEqual(mobileActions.menuBottom);
+  }
+});
+
 test("반려동물 생성부터 돌봄, 미니게임, 구매, 장착과 새로고침 저장까지", async ({ page }) => {
   test.setTimeout(240_000);
   await createPet(page);
@@ -152,12 +206,22 @@ test("데모 시간 경과와 모바일 가로 오버플로를 검증한다", as
   await expect(page.locator(".status-shell .need-indicator")).toHaveCount(3);
   for (const label of ["밥", "영양제", "운동"]) await expect(page.locator(`.need-indicator[aria-label^="${label} "]`)).toHaveCount(1);
   await expect(page.locator('.need-indicator[aria-label^="에너지 "]')).toHaveCount(0);
-  const before = await page.locator(".need-indicator.need-joy").getAttribute("aria-label");
+  const exercise = page.locator(".need-indicator.need-joy");
+  await expect(exercise).toContainText("0M 이동");
+  await exercise.click();
+  await expect(page.getByRole("dialog", { name: "오늘의 운동 목표 설정" })).toBeVisible();
+  await page.getByLabel("오늘의 운동 목표량").fill("1500");
+  await page.getByRole("button", { name: "목표 저장" }).click();
+  await expect(exercise).toHaveAttribute("aria-label", /오늘 목표 1,500M/);
+  const beforeExercise = await exercise.getAttribute("aria-label");
+  const beforeCondition = await page.locator(".need-indicator.need-condition").getAttribute("aria-label");
   await page.getByText("DEV", { exact: true }).click();
   await page.getByTestId("advance-1h").click();
-  const after = await page.locator(".need-indicator.need-joy").getAttribute("aria-label");
+  const afterExercise = await exercise.getAttribute("aria-label");
+  const afterCondition = await page.locator(".need-indicator.need-condition").getAttribute("aria-label");
 
-  expect(after).not.toBe(before);
+  expect(afterExercise).toBe(beforeExercise);
+  expect(afterCondition).not.toBe(beforeCondition);
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
   await goToRoom(page, "바다");
@@ -402,6 +466,7 @@ test("동물병원·펫 일기·펫의 탐험 기록은 계정별 저장에 연�
   await page.getByRole("button", { name: "탐험 종료 및 저장" }).click();
   await expect(page.getByText("저녁 강변 탐험").first()).toBeVisible();
   await expect(page.getByText(/m · \d+초/).first()).toBeVisible();
+  await expect(page.locator(".need-indicator.need-joy")).toHaveAttribute("aria-label", /운동 [1-9]\d*M 이동, 오늘 목표 1,000M/);
   await page.getByLabel("닫기").click();
 
   await page.reload();
@@ -413,6 +478,7 @@ test("동물병원·펫 일기·펫의 탐험 기록은 계정별 저장에 연�
   await page.getByLabel("닫기").click();
   await places.getByRole("button", { name: /펫의 탐험/ }).click();
   await expect(page.getByText("저녁 강변 탐험").first()).toBeVisible();
+  await expect(page.locator(".need-indicator.need-joy")).toHaveAttribute("aria-label", /운동 [1-9]\d*M 이동, 오늘 목표 1,000M/);
   await expect(page.getByLabel("저장된 탐험 경로 누적 표시")).toBeVisible();
   await expect(page.getByText("반포한강공원").first()).toBeVisible();
 });
@@ -445,6 +511,7 @@ test("생활 공간 다섯 곳이 고해상도 게임 배경으로 교체되고 
 });
 
 test("Ocean Games는 Ocean Run과 Jump Up 두 게임만 제공한다", async ({ page }) => {
+  test.slow();
   await createPet(page, "파도");
   await goToRoom(page, "바다");
   const beachAsset = await page.request.get("/assets/ocean-beach-game-v2.jpg");

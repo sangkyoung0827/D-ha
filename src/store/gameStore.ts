@@ -5,6 +5,7 @@ import { ITEM_BY_ID, ITEM_CATALOG } from "../domain/catalog";
 import { createDefaultSave } from "../domain/defaults";
 import { progressDailyGoal, refreshDailyGoals, updateBalancedGoal, localDateKey } from "../domain/daily";
 import { calculateMiniGameReward, canPurchase, spendCoins } from "../domain/economy";
+import { addDailyExerciseDistance, refreshDailyExercise, setDailyExerciseGoal } from "../domain/exercise";
 import { attemptScheduledFeeding, changeFeedingFrequency, refreshFeedingPlan } from "../domain/feeding";
 import { levelFromXp, LEVEL_THRESHOLDS } from "../domain/progression";
 import { isOceanGame, oceanCompletionCopy, oceanGameNeedEffects } from "../domain/ocean";
@@ -52,6 +53,7 @@ interface GameActions {
   care(kind: "feed" | "wash" | "sleep" | "wellness" | "play", itemId?: string): void;
   feedScheduledMeal(): FeedingFeedback;
   setFeedingFrequency(frequency: FeedingFrequency): void;
+  setExerciseGoal(goalMeters: number): void;
   purchase(itemId: string): void;
   equip(itemId: string): void;
   setTheme(itemId: string): void;
@@ -105,11 +107,12 @@ function addNotification(save: GameSave, notification: Omit<GameNotification, "i
 
 function saveFromStore(state: GameStore): GameSave {
   return {
-    version: 8,
+    version: 9,
     profile: state.profile,
     tutorialComplete: state.tutorialComplete,
     needs: state.needs,
     feedingPlan: state.feedingPlan,
+    dailyExercise: state.dailyExercise,
     lastSavedAt: state.lastSavedAt,
     lastCareAt: state.lastCareAt,
     coins: state.coins,
@@ -142,6 +145,7 @@ function finalizeSave(next: GameSave, previous: GameSave, now = new Date()): Gam
   const newlyCompleted = dailyGoals.filter((goal) => goal.completed && !previousCompleted.has(goal.id));
   let finalized: GameSave = {
     ...next,
+    dailyExercise: refreshDailyExercise(next.dailyExercise, now),
     dailyDate: refreshed.date,
     dailyGoals,
     coins: next.coins + newlyCompleted.length * 35,
@@ -195,6 +199,7 @@ function prepareHydratedSave(save: GameSave, previous: GameSave, now: Date): Gam
     ...save,
     needs: elapsed.needs,
     feedingPlan: refreshFeedingPlan(save.feedingPlan, now),
+    dailyExercise: refreshDailyExercise(save.dailyExercise, now),
     dailyDate: refreshDailyGoals(save.dailyDate, save.dailyGoals, now).date,
     dailyGoals: refreshDailyGoals(save.dailyDate, save.dailyGoals, now).goals,
     loginStreak: distance === 1 ? save.loginStreak + 1 : distance > 1 ? 1 : save.loginStreak,
@@ -420,6 +425,12 @@ export const useGameStore = create<GameStore>((set, get) => {
       commit((save) => ({ ...save, feedingPlan: changeFeedingFrequency(save.feedingPlan, frequency, now) }), `하루 급양 횟수를 ${frequency}회로 설정했어요.`);
     },
 
+    setExerciseGoal(goalMeters) {
+      const now = new Date();
+      const next = setDailyExerciseGoal(get().dailyExercise, goalMeters, now);
+      commit((save) => ({ ...save, dailyExercise: next }), `오늘의 운동 목표를 ${next.goalMeters.toLocaleString("ko-KR")}M로 설정했어요.`);
+    },
+
     purchase(itemId) {
       const item = ITEM_BY_ID[itemId];
       if (!item) return;
@@ -554,7 +565,12 @@ export const useGameStore = create<GameStore>((set, get) => {
 
     addPetExploration(exploration) {
       const now = new Date();
-      commit((save) => ({ ...save, petExplorations: [{ ...exploration, id: `place-${now.getTime()}`, createdAt: now.toISOString() }, ...save.petExplorations].slice(0, 80) }), "함께한 장소를 지도에 저장했어요.");
+      const trackedDistance = exploration.route.length > 1 ? Math.max(0, Math.round(exploration.distanceMeters)) : 0;
+      commit((save) => ({
+        ...save,
+        dailyExercise: trackedDistance ? addDailyExerciseDistance(save.dailyExercise, trackedDistance, now) : refreshDailyExercise(save.dailyExercise, now),
+        petExplorations: [{ ...exploration, id: `place-${now.getTime()}`, createdAt: now.toISOString() }, ...save.petExplorations].slice(0, 80)
+      }), trackedDistance ? `탐험 경로와 운동량 +${trackedDistance.toLocaleString("ko-KR")}M를 저장했어요.` : "함께한 장소를 지도에 저장했어요.");
     },
 
     removePetExploration(id) {

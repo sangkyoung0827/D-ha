@@ -29,6 +29,12 @@ export interface DailyFeedingPlan {
   completedSlots: FeedingSlotId[];
 }
 
+export interface DailyExercisePlan {
+  date: string;
+  goalMeters: number;
+  distanceMeters: number;
+}
+
 export type ItemCategory =
   | "food"
   | "wellness"
@@ -181,11 +187,12 @@ export interface MiniGameResult {
 }
 
 export interface GameSave {
-  version: 8;
+  version: 9;
   profile: PetProfile;
   tutorialComplete: boolean;
   needs: NeedValues;
   feedingPlan: DailyFeedingPlan;
+  dailyExercise: DailyExercisePlan;
   lastSavedAt: string;
   lastCareAt: string | null;
   coins: number;

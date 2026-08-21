@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { petDescription, type PetAppearance } from "../domain/pet";
 import type { MiniGameResult, RoomId, WearableSlot } from "../domain/types";
 import { gameBridge } from "./bridge/GameBridge";
-import { GAME_HEIGHT, GAME_WIDTH, getRenderScale } from "./renderQuality";
+import { GAME_HEIGHT, GAME_WIDTH, applyHighDpiCamera, getRenderScale } from "./renderQuality";
 import { BootScene } from "./scenes/BootScene";
 import { RoomScene } from "./scenes/RoomScene";
 import type { OceanMode, OceanZoneId } from "../domain/ocean";
@@ -37,27 +37,57 @@ export function GameCanvas(props: GameCanvasProps) {
 
   useEffect(() => {
     if (!hostRef.current || gameRef.current) return;
+    const host = hostRef.current;
     const renderScale = getRenderScale();
+    const viewportWidth = Math.max(1, host.clientWidth || GAME_WIDTH);
+    const viewportHeight = Math.max(1, host.clientHeight || GAME_HEIGHT);
+    const pixelWidth = Math.round(viewportWidth * renderScale);
+    const pixelHeight = Math.round(viewportHeight * renderScale);
     const initialPresentation = presentationRef.current;
     const game = new Phaser.Game({
       type: Phaser.AUTO,
-      width: GAME_WIDTH * renderScale,
-      height: GAME_HEIGHT * renderScale,
-      parent: hostRef.current,
+      width: pixelWidth,
+      height: pixelHeight,
+      parent: host,
       transparent: true,
       scene: [BootScene, RoomScene],
       render: { antialias: true, antialiasGL: true, pixelArt: false, roundPixels: false, powerPreference: "high-performance" },
-      scale: { mode: Phaser.Scale.ENVELOP, autoCenter: Phaser.Scale.CENTER_BOTH, width: GAME_WIDTH * renderScale, height: GAME_HEIGHT * renderScale, autoRound: false },
+      scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: pixelWidth, height: pixelHeight, autoRound: false },
       input: { activePointers: 2 },
       callbacks: {
         preBoot(bootingGame) {
           bootingGame.registry.set("render-scale", renderScale);
+          bootingGame.registry.set("viewport-width", viewportWidth);
+          bootingGame.registry.set("viewport-height", viewportHeight);
           bootingGame.registry.set("initial-presentation", initialPresentation);
         }
       }
     });
     gameRef.current = game;
+
+    let resizeFrame = 0;
+    let previousWidth = viewportWidth;
+    let previousHeight = viewportHeight;
+    const resizeObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        const nextWidth = Math.max(1, host.clientWidth || GAME_WIDTH);
+        const nextHeight = Math.max(1, host.clientHeight || GAME_HEIGHT);
+        if (Math.abs(nextWidth - previousWidth) < 1 && Math.abs(nextHeight - previousHeight) < 1) return;
+        previousWidth = nextWidth;
+        previousHeight = nextHeight;
+        const nextScale = getRenderScale();
+        game.registry.set("render-scale", nextScale);
+        game.registry.set("viewport-width", nextWidth);
+        game.registry.set("viewport-height", nextHeight);
+        game.scale.setGameSize(Math.round(nextWidth * nextScale), Math.round(nextHeight * nextScale));
+        for (const scene of game.scene.getScenes(true)) applyHighDpiCamera(scene);
+      });
+    });
+    resizeObserver.observe(host);
     return () => {
+      resizeObserver.disconnect();
+      cancelAnimationFrame(resizeFrame);
       gameRef.current?.destroy(true);
       gameRef.current = null;
     };

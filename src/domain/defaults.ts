@@ -1,5 +1,6 @@
 import { createDailyGoals, localDateKey } from "./daily";
 import { createDailyFeedingPlan } from "./feeding";
+import { createDailyExercisePlan } from "./exercise";
 import { STARTER_INVENTORY } from "./catalog";
 import type { PetProfile } from "./pet";
 import type { GameSave } from "./types";
@@ -19,11 +20,12 @@ export const DEFAULT_PROFILE: PetProfile = {
 export function createDefaultSave(now = new Date(), profile = DEFAULT_PROFILE): GameSave {
   const date = localDateKey(now);
   return {
-    version: 8,
+    version: 9,
     profile,
     tutorialComplete: false,
     needs: { satiety: 78, hygiene: 76, energy: 72, joy: 80, condition: 77 },
     feedingPlan: createDailyFeedingPlan(now),
+    dailyExercise: createDailyExercisePlan(now),
     lastSavedAt: now.toISOString(),
     lastCareAt: null,
     coins: 500,
